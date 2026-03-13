@@ -77,4 +77,4 @@ imgX-Clip/
 | コマンド | 引数 | 戻り値 | 説明 |
 |---------|------|--------|------|
 | `load_image` | `path: string` | `ImageMetadata` | 画像読み込みとBase64エンコード |
-| `clip_and_save` | `src_path, top_y, bottom_y, dest_path` | `void` | Y範囲クリップ・保存 |
+| `clip_and_save` | `src_path, top_y, bottom_y, dest_path` | `void` | Y範囲除去・上下結合保存 |

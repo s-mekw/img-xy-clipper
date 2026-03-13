@@ -1,5 +1,5 @@
-use serde::{Deserialize, Serialize};
 use crate::image_processor;
+use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct ImageMetadata {
