@@ -36,7 +36,6 @@ const sampleImageMetadata = {
 };
 
 const sampleImagePath = "C:\\images\\sample.png";
-const sampleSavePath = "C:\\output\\clipped.png";
 
 // ============================================================
 // App コンポーネント統合テストスイート（TASK-0007）
@@ -133,7 +132,6 @@ describe("App 統合テスト（TASK-0007 TC-001〜TC-018）", () => {
     // 【初期条件設定】: 画像読み込み済み（height=200）でドラッグによりクリップ範囲が設定された状態
     mockOpen.mockResolvedValueOnce(sampleImagePath);
     mockInvoke.mockResolvedValueOnce({ ...sampleImageMetadata, height: 200 });
-    mockSave.mockResolvedValueOnce(sampleSavePath);
     mockInvoke.mockResolvedValueOnce(undefined);
 
     // 【実際の処理実行】: 画像読み込み→保存の一連フロー
@@ -151,7 +149,7 @@ describe("App 統合テスト（TASK-0007 TC-001〜TC-018）", () => {
         src_path: sampleImagePath, // 【確認内容】: src_path（snake_case）で渡される 🔵
         top_y: 0,                  // 【確認内容】: top_y（snake_case）で渡される 🔵
         bottom_y: 0,               // 【確認内容】: bottom_y=0（除去なし初期値） 🔵
-        dest_path: sampleSavePath, // 【確認内容】: dest_path（snake_case）で渡される 🔵
+        dest_path: sampleImagePath, // 【確認内容】: overwriteモードでは元画像パスに上書き 🔵
       });
     });
   });
@@ -165,11 +163,10 @@ describe("App 統合テスト（TASK-0007 TC-001〜TC-018）", () => {
     // 【期待される動作】: SAVE_SUCCESS でエラーが発生せず error-bar が非表示
     // 🔵 信頼性レベル: App.tsx の SAVE_SUCCESS アクション・error-bar 条件付きレンダリングより
 
-    // 【テストデータ準備】: 画像読み込みと保存の正常ケース
+    // 【テストデータ準備】: 画像読み込みと保存の正常ケース（overwriteモード: save()不要）
     mockOpen.mockResolvedValueOnce(sampleImagePath);
     mockInvoke.mockResolvedValueOnce(sampleImageMetadata);
-    mockSave.mockResolvedValueOnce(sampleSavePath);
-    mockInvoke.mockResolvedValueOnce(undefined);
+    mockInvoke.mockResolvedValueOnce(undefined); // clip_and_save 成功
 
     // 【実際の処理実行】: 画像読み込み→保存の一連フロー
     const user = userEvent.setup();
@@ -223,18 +220,18 @@ describe("App 統合テスト（TASK-0007 TC-001〜TC-018）", () => {
   });
 
   // ============================================================
-  // TC-006: Toolbarの「クリップして保存」ボタンが保存ダイアログを起動する
+  // TC-006: overwrite モードでは save() ダイアログなしで直接上書き保存
   // ============================================================
-  test("TC-006: 「保存」クリックでsave()がデフォルト名{元名}_clipped.{元拡張子}とPNG/JPEGフィルタで呼ばれる", async () => {
-    // 【テスト目的】: 「保存」ボタンクリックで save() が元画像名ベースのデフォルトパス付きで呼ばれること
-    // 【テスト内容】: save() の呼び出し引数に defaultPath='sample_clipped.png' が含まれることを検証
-    // 【期待される動作】: save({ defaultPath: 'sample_clipped.png', filters: [...] }) が呼ばれる
-    // 🔵 信頼性レベル: テストケース定義書TC-006・App.tsx の handleSaveImage の save() 呼び出しより
+  test("TC-006: overwriteモードではsave()が呼ばれずdest_pathが元画像パスと一致する", async () => {
+    // 【テスト目的】: デフォルト設定（overwrite）では save() ダイアログが表示されず、
+    //                元画像パスに直接上書き保存されることを確認
+    // 【テスト内容】: save() が呼ばれないこと、clip_and_save の dest_path が元画像パスであることを検証
+    // 🔵 信頼性レベル: config.json saveMode="overwrite" 仕様より
 
-    // 【テストデータ準備】: 画像読み込み後、保存ダイアログキャンセル（引数のみ確認）
+    // 【テストデータ準備】: 画像読み込み後、保存（overwriteモード）
     mockOpen.mockResolvedValueOnce(sampleImagePath);
     mockInvoke.mockResolvedValueOnce(sampleImageMetadata);
-    mockSave.mockResolvedValueOnce(null);
+    mockInvoke.mockResolvedValueOnce(undefined); // clip_and_save 成功
 
     // 【実際の処理実行】: 画像読み込み→保存ボタンクリック
     const user = userEvent.setup();
@@ -244,17 +241,13 @@ describe("App 統合テスト（TASK-0007 TC-001〜TC-018）", () => {
     await waitFor(() => expect(screen.getByText("保存")).not.toBeDisabled());
     await user.click(screen.getByText("保存"));
 
-    // 【結果検証】: save() がデフォルトパス付きで呼ばれたこと
+    // 【結果検証】: overwrite モードでは save() ダイアログが呼ばれない
     await waitFor(() => {
-      expect(mockSave).toHaveBeenCalledWith(
-        expect.objectContaining({
-          defaultPath: "sample_clipped.png", // 【確認内容】: デフォルトファイル名が {元名}_clipped.{元拡張子} 🔵
-          filters: expect.arrayContaining([
-            expect.objectContaining({ name: "PNG" }), // 【確認内容】: PNG フィルタが存在する 🔵
-          ]),
-        })
-      );
+      expect(mockInvoke).toHaveBeenCalledWith("clip_and_save", expect.objectContaining({
+        destPath: sampleImagePath, // 【確認内容】: dest_path が元画像パスと一致する 🔵
+      }));
     });
+    expect(mockSave).not.toHaveBeenCalled(); // 【確認内容】: save() ダイアログは呼ばれない 🔵
   });
 
   // ============================================================
@@ -332,11 +325,10 @@ describe("App 統合テスト（TASK-0007 TC-001〜TC-018）", () => {
     // ⚠️ 注意: 現在の App.tsx 実装では SAVE_ERROR payload にエラーメッセージのみを設定（プレフィックスなし）
     //          テストケース定義書の仕様ではプレフィックスが期待されているため、このテストは失敗する
 
-    // 【テストデータ準備】: 保存失敗のシナリオ
+    // 【テストデータ準備】: 保存失敗のシナリオ（overwriteモード: save()不要）
     // 【初期条件設定】: 書き込み権限不足によるエラーを再現
     mockOpen.mockResolvedValueOnce(sampleImagePath);
     mockInvoke.mockResolvedValueOnce(sampleImageMetadata);
-    mockSave.mockResolvedValueOnce(sampleSavePath);
     mockInvoke.mockRejectedValueOnce(new Error("保存先に書き込み権限がありません"));
 
     // 【実際の処理実行】: 画像読み込み→保存（失敗）
@@ -388,18 +380,17 @@ describe("App 統合テスト（TASK-0007 TC-001〜TC-018）", () => {
   // ============================================================
   // TC-011: 保存ダイアログキャンセル時に何も処理されない
   // ============================================================
-  test("TC-011: 保存ダイアログキャンセル時にclip_and_saveが呼ばれずisSavingがfalseに戻る", async () => {
-    // 【テスト目的】: save() が null を返した場合、clip_and_save IPC が呼ばれず保存中状態が解除されること
-    // 【テスト内容】: 保存キャンセル後に「保存」ボタンが再び有効化されることを検証
-    // 【期待される動作】: invoke('clip_and_save') が呼ばれず、isSaving=false になる
-    // 🔵 信頼性レベル: テストケース定義書TC-011・App.tsx の handleSaveImage キャンセル処理より
+  test("TC-011: overwriteモードではsave()が呼ばれずclip_and_saveが直接実行される", async () => {
+    // 【テスト目的】: overwrite モードでは save() ダイアログが呼ばれないことを確認
+    // 【テスト内容】: save() が呼ばれず、clip_and_save が元画像パスで直接呼び出されることを検証
+    // 🔵 信頼性レベル: config.json saveMode="overwrite" 仕様より
 
-    // 【テストデータ準備】: 画像読み込み成功後、保存ダイアログキャンセル
+    // 【テストデータ準備】: 画像読み込み成功後、overwriteモードで直接保存
     mockOpen.mockResolvedValueOnce(sampleImagePath);
     mockInvoke.mockResolvedValueOnce(sampleImageMetadata);
-    mockSave.mockResolvedValueOnce(null); // 保存ダイアログキャンセル
+    mockInvoke.mockResolvedValueOnce(undefined); // clip_and_save 成功
 
-    // 【実際の処理実行】: 画像読み込み→保存ダイアログキャンセル
+    // 【実際の処理実行】: 画像読み込み→保存
     const user = userEvent.setup();
     render(<App />);
 
@@ -407,16 +398,15 @@ describe("App 統合テスト（TASK-0007 TC-001〜TC-018）", () => {
     await waitFor(() => expect(screen.getByText("保存")).not.toBeDisabled());
     await user.click(screen.getByText("保存"));
 
+    // 【結果検証】: save() が呼ばれていないこと
     await waitFor(() => {
-      expect(mockSave).toHaveBeenCalledTimes(1);
+      expect(mockInvoke).toHaveBeenCalledWith("clip_and_save", expect.anything());
     });
-
-    // 【結果検証】: clip_and_save が呼ばれていないこと
-    expect(mockInvoke).not.toHaveBeenCalledWith("clip_and_save", expect.anything()); // 【確認内容】: clip_and_save が呼ばれない 🔵
+    expect(mockSave).not.toHaveBeenCalled(); // 【確認内容】: overwriteモードではsave()が呼ばれない 🔵
 
     // 【追加検証】: 「保存」ボタンが再び有効化されること（isSaving=false）
     await waitFor(() => {
-      expect(screen.getByText("保存")).not.toBeDisabled(); // 【確認内容】: キャンセル後に保存ボタンが有効化される 🔵
+      expect(screen.getByText("保存")).not.toBeDisabled(); // 【確認内容】: 保存完了後にボタンが有効化される 🔵
     });
   });
 
@@ -559,8 +549,7 @@ describe("App 統合テスト（TASK-0007 TC-001〜TC-018）", () => {
 
     mockOpen.mockResolvedValueOnce(sampleImagePath);
     mockInvoke.mockResolvedValueOnce({ ...sampleImageMetadata, height: 200 });
-    mockSave.mockResolvedValueOnce(sampleSavePath);
-    mockInvoke.mockResolvedValueOnce(undefined);
+    mockInvoke.mockResolvedValueOnce(undefined); // clip_and_save 成功（overwriteモード: save()不要）
 
     const user = userEvent.setup();
     render(<App />);
@@ -575,7 +564,7 @@ describe("App 統合テスト（TASK-0007 TC-001〜TC-018）", () => {
         src_path: sampleImagePath, // 【確認内容】: snake_case引数 src_path 🟡
         top_y: 0,                  // 【確認内容】: top_y=0（初期値） 🟡
         bottom_y: 0,               // 【確認内容】: bottom_y=0（除去なし初期値） 🟡
-        dest_path: sampleSavePath, // 【確認内容】: snake_case引数 dest_path 🟡
+        dest_path: sampleImagePath, // 【確認内容】: overwriteモードでは元画像パスに上書き 🟡
       });
     });
   });
@@ -593,10 +582,9 @@ describe("App 統合テスト（TASK-0007 TC-001〜TC-018）", () => {
     //          テストケース定義書TC-017の仕様では isSaving 時に「保存中...」に変わることが期待されているが
     //          現在の Toolbar.tsx には三項演算子によるテキスト変更が実装されていない
 
-    // 【テストデータ準備】: 保存が永続的に保留の状態
+    // 【テストデータ準備】: 保存が永続的に保留の状態（overwriteモード: save()不要）
     mockOpen.mockResolvedValueOnce(sampleImagePath);
     mockInvoke.mockResolvedValueOnce(sampleImageMetadata);
-    mockSave.mockResolvedValueOnce(sampleSavePath);
 
     let resolveSave: (value: unknown) => void = () => {};
     const pendingSave = new Promise((resolve) => {

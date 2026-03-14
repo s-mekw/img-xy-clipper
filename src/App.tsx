@@ -10,6 +10,7 @@ import { open, save } from "@tauri-apps/plugin-dialog";
 import Toolbar from "./components/Toolbar";
 import ImageCanvas from "./components/ImageCanvas";
 import PreviewPanel from "./components/PreviewPanel";
+import config from "./config.json";
 import "./App.css";
 
 // ============================================================
@@ -351,26 +352,31 @@ function App() {
     dispatch({ type: "SAVE_START" });
 
     try {
-      // 【保存ダイアログ】: デフォルトファイル名付きの保存先ダイアログを表示
-      // 🔵 note.md「Tauri IPC 連携パターン」の handleSaveImage より
-      // 🔵 フィルタ設定: SAVE_DIALOG_FILTERS 定数を参照（TC-006仕様: "PNG"/"JPEG" フィルタ名）
-      // "C:\photos\photo.png" → "photo_clipped.png"
+      // 【保存先決定】: config.saveMode に応じて保存フローを分岐
       const fileName = state.imagePath.split(/[/\\]/).pop() ?? "clipped.png";
-      const dotIdx = fileName.lastIndexOf(".");
-      const defaultPath = dotIdx > 0
-        ? `${fileName.slice(0, dotIdx)}_clipped${fileName.slice(dotIdx)}`
-        : `${fileName}_clipped.png`;
 
-      const destPath = await save({
-        defaultPath,
-        filters: SAVE_DIALOG_FILTERS,
-      });
+      let destPath: string | null;
 
-      // 【キャンセル処理】: ダイアログでキャンセルされた場合は 'ready' 状態に戻す
-      // 🟡 要件定義書4.3「ファイルダイアログキャンセル時は何もしない」より
-      if (!destPath) {
-        dispatch({ type: "SAVE_SUCCESS" }); // 【状態復元】: saving → ready に戻す
-        return;
+      if (config.saveMode === "overwrite") {
+        // 【overwrite モード】: ダイアログなし、元パスに直接上書き保存
+        destPath = state.imagePath;
+      } else {
+        // 【clipped モード】: ダイアログ表示、{元名}_clipped.{元拡張子} をデフォルトパスに
+        const dotIdx = fileName.lastIndexOf(".");
+        const defaultPath = dotIdx > 0
+          ? `${fileName.slice(0, dotIdx)}_clipped${fileName.slice(dotIdx)}`
+          : `${fileName}_clipped.png`;
+
+        destPath = await save({
+          defaultPath,
+          filters: SAVE_DIALOG_FILTERS,
+        });
+
+        // 【キャンセル処理】: ダイアログでキャンセルされた場合は 'ready' 状態に戻す
+        if (!destPath) {
+          dispatch({ type: "SAVE_SUCCESS" }); // 【状態復元】: saving → ready に戻す
+          return;
+        }
       }
 
       // 【IPC呼び出し】: Rust側にクリップ・保存を依頼
