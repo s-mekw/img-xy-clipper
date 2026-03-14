@@ -6,7 +6,7 @@
  */
 import { useReducer, useCallback } from "react";
 import { invoke } from "@tauri-apps/api/core";
-import { open, save } from "@tauri-apps/plugin-dialog";
+import { open, save, confirm } from "@tauri-apps/plugin-dialog";
 import Toolbar from "./components/Toolbar";
 import ImageCanvas from "./components/ImageCanvas";
 import PreviewPanel from "./components/PreviewPanel";
@@ -358,7 +358,15 @@ function App() {
       let destPath: string | null;
 
       if (config.saveMode === "overwrite") {
-        // 【overwrite モード】: ダイアログなし、元パスに直接上書き保存
+        // 【overwrite モード】: 確認ダイアログで承認後、元パスに直接上書き保存
+        const confirmed = await confirm(
+          `${fileName} を上書き保存します。よろしいですか？`,
+          { title: "上書き保存の確認", kind: "warning" }
+        );
+        if (!confirmed) {
+          dispatch({ type: "SAVE_SUCCESS" }); // saving → ready に戻す
+          return;
+        }
         destPath = state.imagePath;
       } else {
         // 【clipped モード】: ダイアログ表示、{元名}_clipped.{元拡張子} をデフォルトパスに

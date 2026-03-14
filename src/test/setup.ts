@@ -37,6 +37,7 @@ vi.mock("@tauri-apps/api/core", () => ({
 vi.mock("@tauri-apps/plugin-dialog", () => ({
   open: vi.fn(),
   save: vi.fn(),
+  confirm: vi.fn(),
 }));
 
 // 【requestAnimationFrame モック】: テスト環境では rAF を同期的に実行する

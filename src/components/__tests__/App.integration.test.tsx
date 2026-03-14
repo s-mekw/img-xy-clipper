@@ -10,7 +10,7 @@ import { render, screen, waitFor, act } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, test, expect, beforeEach, afterEach, vi } from "vitest";
 import { invoke } from "@tauri-apps/api/core";
-import { open, save } from "@tauri-apps/plugin-dialog";
+import { open, save, confirm } from "@tauri-apps/plugin-dialog";
 
 // 【テスト対象のコンポーネントインポート】
 import App from "../../App";
@@ -22,6 +22,7 @@ import App from "../../App";
 const mockInvoke = vi.mocked(invoke);
 const mockOpen = vi.mocked(open);
 const mockSave = vi.mocked(save);
+const mockConfirm = vi.mocked(confirm);
 
 // ============================================================
 // テスト用フィクスチャデータ
@@ -132,6 +133,7 @@ describe("App 統合テスト（TASK-0007 TC-001〜TC-018）", () => {
     // 【初期条件設定】: 画像読み込み済み（height=200）でドラッグによりクリップ範囲が設定された状態
     mockOpen.mockResolvedValueOnce(sampleImagePath);
     mockInvoke.mockResolvedValueOnce({ ...sampleImageMetadata, height: 200 });
+    mockConfirm.mockResolvedValueOnce(true);
     mockInvoke.mockResolvedValueOnce(undefined);
 
     // 【実際の処理実行】: 画像読み込み→保存の一連フロー
@@ -166,6 +168,7 @@ describe("App 統合テスト（TASK-0007 TC-001〜TC-018）", () => {
     // 【テストデータ準備】: 画像読み込みと保存の正常ケース（overwriteモード: save()不要）
     mockOpen.mockResolvedValueOnce(sampleImagePath);
     mockInvoke.mockResolvedValueOnce(sampleImageMetadata);
+    mockConfirm.mockResolvedValueOnce(true);
     mockInvoke.mockResolvedValueOnce(undefined); // clip_and_save 成功
 
     // 【実際の処理実行】: 画像読み込み→保存の一連フロー
@@ -231,6 +234,7 @@ describe("App 統合テスト（TASK-0007 TC-001〜TC-018）", () => {
     // 【テストデータ準備】: 画像読み込み後、保存（overwriteモード）
     mockOpen.mockResolvedValueOnce(sampleImagePath);
     mockInvoke.mockResolvedValueOnce(sampleImageMetadata);
+    mockConfirm.mockResolvedValueOnce(true);
     mockInvoke.mockResolvedValueOnce(undefined); // clip_and_save 成功
 
     // 【実際の処理実行】: 画像読み込み→保存ボタンクリック
@@ -241,8 +245,12 @@ describe("App 統合テスト（TASK-0007 TC-001〜TC-018）", () => {
     await waitFor(() => expect(screen.getByText("保存")).not.toBeDisabled());
     await user.click(screen.getByText("保存"));
 
-    // 【結果検証】: overwrite モードでは save() ダイアログが呼ばれない
+    // 【結果検証】: confirm が正しいメッセージで呼ばれ、承認後に clip_and_save が実行される
     await waitFor(() => {
+      expect(mockConfirm).toHaveBeenCalledWith(
+        "sample.png を上書き保存します。よろしいですか？",
+        { title: "上書き保存の確認", kind: "warning" }
+      );
       expect(mockInvoke).toHaveBeenCalledWith("clip_and_save", expect.objectContaining({
         destPath: sampleImagePath, // 【確認内容】: dest_path が元画像パスと一致する 🔵
       }));
@@ -329,6 +337,7 @@ describe("App 統合テスト（TASK-0007 TC-001〜TC-018）", () => {
     // 【初期条件設定】: 書き込み権限不足によるエラーを再現
     mockOpen.mockResolvedValueOnce(sampleImagePath);
     mockInvoke.mockResolvedValueOnce(sampleImageMetadata);
+    mockConfirm.mockResolvedValueOnce(true);
     mockInvoke.mockRejectedValueOnce(new Error("保存先に書き込み権限がありません"));
 
     // 【実際の処理実行】: 画像読み込み→保存（失敗）
@@ -380,17 +389,17 @@ describe("App 統合テスト（TASK-0007 TC-001〜TC-018）", () => {
   // ============================================================
   // TC-011: 保存ダイアログキャンセル時に何も処理されない
   // ============================================================
-  test("TC-011: overwriteモードではsave()が呼ばれずclip_and_saveが直接実行される", async () => {
-    // 【テスト目的】: overwrite モードでは save() ダイアログが呼ばれないことを確認
-    // 【テスト内容】: save() が呼ばれず、clip_and_save が元画像パスで直接呼び出されることを検証
-    // 🔵 信頼性レベル: config.json saveMode="overwrite" 仕様より
+  test("TC-011: overwrite確認ダイアログでキャンセルするとclip_and_saveが呼ばれない", async () => {
+    // 【テスト目的】: overwrite モードで confirm() が false を返した場合、clip_and_save が呼ばれないことを確認
+    // 【テスト内容】: confirm() でキャンセル後、clip_and_save が呼ばれずステータスが ready に戻ることを検証
+    // 🔵 信頼性レベル: config.json saveMode="overwrite" 仕様・確認ダイアログキャンセル動作より
 
-    // 【テストデータ準備】: 画像読み込み成功後、overwriteモードで直接保存
+    // 【テストデータ準備】: 画像読み込み成功後、overwriteモードで確認ダイアログをキャンセル
     mockOpen.mockResolvedValueOnce(sampleImagePath);
     mockInvoke.mockResolvedValueOnce(sampleImageMetadata);
-    mockInvoke.mockResolvedValueOnce(undefined); // clip_and_save 成功
+    mockConfirm.mockResolvedValueOnce(false); // 確認ダイアログでキャンセル
 
-    // 【実際の処理実行】: 画像読み込み→保存
+    // 【実際の処理実行】: 画像読み込み→保存→キャンセル
     const user = userEvent.setup();
     render(<App />);
 
@@ -398,15 +407,15 @@ describe("App 統合テスト（TASK-0007 TC-001〜TC-018）", () => {
     await waitFor(() => expect(screen.getByText("保存")).not.toBeDisabled());
     await user.click(screen.getByText("保存"));
 
-    // 【結果検証】: save() が呼ばれていないこと
+    // 【結果検証】: confirm() が呼ばれたが clip_and_save は呼ばれないこと
     await waitFor(() => {
-      expect(mockInvoke).toHaveBeenCalledWith("clip_and_save", expect.anything());
+      expect(mockConfirm).toHaveBeenCalledTimes(1);
     });
-    expect(mockSave).not.toHaveBeenCalled(); // 【確認内容】: overwriteモードではsave()が呼ばれない 🔵
+    expect(mockInvoke).not.toHaveBeenCalledWith("clip_and_save", expect.anything()); // 【確認内容】: キャンセル時はclip_and_saveが呼ばれない 🔵
 
-    // 【追加検証】: 「保存」ボタンが再び有効化されること（isSaving=false）
+    // 【追加検証】: 「保存」ボタンが再び有効化されること（saving → ready に戻る）
     await waitFor(() => {
-      expect(screen.getByText("保存")).not.toBeDisabled(); // 【確認内容】: 保存完了後にボタンが有効化される 🔵
+      expect(screen.getByText("保存")).not.toBeDisabled(); // 【確認内容】: キャンセル後にボタンが有効化される 🔵
     });
   });
 
@@ -549,6 +558,7 @@ describe("App 統合テスト（TASK-0007 TC-001〜TC-018）", () => {
 
     mockOpen.mockResolvedValueOnce(sampleImagePath);
     mockInvoke.mockResolvedValueOnce({ ...sampleImageMetadata, height: 200 });
+    mockConfirm.mockResolvedValueOnce(true);
     mockInvoke.mockResolvedValueOnce(undefined); // clip_and_save 成功（overwriteモード: save()不要）
 
     const user = userEvent.setup();
@@ -585,6 +595,7 @@ describe("App 統合テスト（TASK-0007 TC-001〜TC-018）", () => {
     // 【テストデータ準備】: 保存が永続的に保留の状態（overwriteモード: save()不要）
     mockOpen.mockResolvedValueOnce(sampleImagePath);
     mockInvoke.mockResolvedValueOnce(sampleImageMetadata);
+    mockConfirm.mockResolvedValueOnce(true);
 
     let resolveSave: (value: unknown) => void = () => {};
     const pendingSave = new Promise((resolve) => {
