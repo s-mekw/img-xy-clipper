@@ -20,6 +20,12 @@ body {
   height: 100vh;
 }
 
+.content-area {
+  display: flex;
+  gap: 16px;
+  padding: 16px;
+}
+
 #toolbar {
   display: flex;
   gap: 8px;

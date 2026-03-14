@@ -95,6 +95,13 @@ button {
   margin-right: 5px;
 }
 
+.content-area {
+  display: flex;
+  align-items: flex-end;
+  gap: 16px;
+  padding: 16px;
+}
+
 @media (prefers-color-scheme: dark) {
   :root {
     color: #f6f6f6;
