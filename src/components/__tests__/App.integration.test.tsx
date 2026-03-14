@@ -225,10 +225,10 @@ describe("App 統合テスト（TASK-0007 TC-001〜TC-018）", () => {
   // ============================================================
   // TC-006: Toolbarの「クリップして保存」ボタンが保存ダイアログを起動する
   // ============================================================
-  test("TC-006: 「保存」クリックでsave()がデフォルト名clipped.pngとPNG/JPEGフィルタで呼ばれる", async () => {
-    // 【テスト目的】: 「保存」ボタンクリックで save() がデフォルトパス付きで呼ばれること
-    // 【テスト内容】: save() の呼び出し引数に defaultPath='clipped.png' が含まれることを検証
-    // 【期待される動作】: save({ defaultPath: 'clipped.png', filters: [...] }) が呼ばれる
+  test("TC-006: 「保存」クリックでsave()がデフォルト名{元名}_clipped.{元拡張子}とPNG/JPEGフィルタで呼ばれる", async () => {
+    // 【テスト目的】: 「保存」ボタンクリックで save() が元画像名ベースのデフォルトパス付きで呼ばれること
+    // 【テスト内容】: save() の呼び出し引数に defaultPath='sample_clipped.png' が含まれることを検証
+    // 【期待される動作】: save({ defaultPath: 'sample_clipped.png', filters: [...] }) が呼ばれる
     // 🔵 信頼性レベル: テストケース定義書TC-006・App.tsx の handleSaveImage の save() 呼び出しより
 
     // 【テストデータ準備】: 画像読み込み後、保存ダイアログキャンセル（引数のみ確認）
@@ -248,7 +248,7 @@ describe("App 統合テスト（TASK-0007 TC-001〜TC-018）", () => {
     await waitFor(() => {
       expect(mockSave).toHaveBeenCalledWith(
         expect.objectContaining({
-          defaultPath: "clipped.png", // 【確認内容】: デフォルトファイル名が clipped.png 🔵
+          defaultPath: "sample_clipped.png", // 【確認内容】: デフォルトファイル名が {元名}_clipped.{元拡張子} 🔵
           filters: expect.arrayContaining([
             expect.objectContaining({ name: "PNG" }), // 【確認内容】: PNG フィルタが存在する 🔵
           ]),

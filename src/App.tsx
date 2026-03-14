@@ -354,8 +354,15 @@ function App() {
       // 【保存ダイアログ】: デフォルトファイル名付きの保存先ダイアログを表示
       // 🔵 note.md「Tauri IPC 連携パターン」の handleSaveImage より
       // 🔵 フィルタ設定: SAVE_DIALOG_FILTERS 定数を参照（TC-006仕様: "PNG"/"JPEG" フィルタ名）
+      // "C:\photos\photo.png" → "photo_clipped.png"
+      const fileName = state.imagePath.split(/[/\\]/).pop() ?? "clipped.png";
+      const dotIdx = fileName.lastIndexOf(".");
+      const defaultPath = dotIdx > 0
+        ? `${fileName.slice(0, dotIdx)}_clipped${fileName.slice(dotIdx)}`
+        : `${fileName}_clipped.png`;
+
       const destPath = await save({
-        defaultPath: "clipped.png",
+        defaultPath,
         filters: SAVE_DIALOG_FILTERS,
       });
 
