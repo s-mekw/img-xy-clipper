@@ -33,7 +33,6 @@ interface IPreviewPanelProps {
 // 【参照元】: note.md「Canvas描画戦略」の「固定サイズ: 200px x 300px」
 // 【設計意図】: 固定サイズにすることで、大規模画像でもメモリ効率的なプレビューを実現
 const PREVIEW_WIDTH = 200;
-const PREVIEW_HEIGHT = 300;
 
 /**
  * 【機能概要】: Base64画像の topY〜bottomY 範囲を拡大してCanvasに描画するコンポーネント
@@ -52,6 +51,12 @@ const PreviewPanel: React.FC<IPreviewPanelProps> = ({
 }) => {
   // 【Ref定義1】: Canvas要素への参照（Canvas API操作のために使用） 🔵
   const canvasRef = useRef<HTMLCanvasElement>(null);
+
+  // 【動的Canvas高さ計算】: クリップ結果の実際のアスペクト比に基づいてCanvas高さを算出
+  const keptHeight = topY + (imageHeight - bottomY);
+  const canvasHeight = imageWidth > 0 && keptHeight > 0
+    ? Math.round(PREVIEW_WIDTH * (keptHeight / imageWidth))
+    : PREVIEW_WIDTH;
 
   // 【Ref定義2】: ロード済み Image オブジェクトのキャッシュ 🔵
   // 【改善内容】: Greenフェーズでは毎回 new Image() を作成していたが、
@@ -166,7 +171,7 @@ const PreviewPanel: React.FC<IPreviewPanelProps> = ({
       id="preview-canvas"
       className="preview-panel"
       width={PREVIEW_WIDTH}
-      height={PREVIEW_HEIGHT}
+      height={canvasHeight}
     />
   );
 };
