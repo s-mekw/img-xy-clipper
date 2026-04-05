@@ -68,7 +68,7 @@ export function useClipRegion(imageHeight: number) {
       setRegion((prev) => {
         if (draggingLine === "top") {
           // 【topY更新処理】: clampTopY で 0〜(bottomY-1) の範囲にクランプ 🔵
-          return { ...prev, topY: clampTopY(y, prev.bottomY) };
+          return { ...prev, topY: clampTopY(y, 0, prev.bottomY) };
         } else {
           // 【bottomY更新処理】: clampBottomY で (topY+1)〜imageHeight の範囲にクランプ 🔵
           return { ...prev, bottomY: clampBottomY(y, prev.topY, imageHeight) };

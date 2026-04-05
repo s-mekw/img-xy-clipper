@@ -46,7 +46,10 @@ describe("ImageCanvas", () => {
       imageHeight: 0,
       topY: 0,
       bottomY: 0,
+      trimTopY: 0,
+      trimBottomY: 0,
       onClipRegionChange: vi.fn(),
+      onTrimRegionChange: vi.fn(),
     };
 
     // 【実際の処理実行】: 画像なし状態でコンポーネントをレンダリング
@@ -75,7 +78,10 @@ describe("ImageCanvas", () => {
       imageHeight: 300,
       topY: 0,
       bottomY: 300,
+      trimTopY: 0,
+      trimBottomY: 300,
       onClipRegionChange: vi.fn(),
+      onTrimRegionChange: vi.fn(),
     };
 
     // 【実際の処理実行】: 画像データありでコンポーネントをレンダリング
@@ -108,7 +114,10 @@ describe("ImageCanvas", () => {
       imageHeight: 300,
       topY: 50,
       bottomY: 250,
+      trimTopY: 0,
+      trimBottomY: 300,
       onClipRegionChange: mockOnClipRegionChange,
+      onTrimRegionChange: vi.fn(),
     };
 
     // 【実際の処理実行】: コンポーネントをレンダリングしてマウスイベントを発火
@@ -152,11 +161,12 @@ describe("ImageCanvas", () => {
       imageHeight: 300,
       topY: 0,
       bottomY: 300,
+      trimTopY: 0,
+      trimBottomY: 300,
       onClipRegionChange: mockOnClipRegionChange,
+      onTrimRegionChange: vi.fn(),
     };
 
-    // 【実際の処理実行】: コンポーネントをレンダリングしてマウスイベントを発火
-    // 【処理内容】: 水平線から離れた位置（y=150）でマウスダウン → mousemove
     const { container } = render(<ImageCanvas {...props} />);
     const canvas = container.querySelector("canvas");
 
@@ -180,40 +190,40 @@ describe("ImageCanvas", () => {
   // ============================================================
   // TC-016b: 重なり時にbottomYを掴めること
   // ============================================================
-  test("TC-016b: topY=0, bottomY=0（重なり状態）でクリックするとbottomYがドラッグされる", () => {
-    // 【テスト目的】: 2本の線が重なっている初期状態でクリックした場合、bottomYがドラッグされること
-    // 【テスト内容】: topY=0, bottomY=0（重なり状態）でy=0付近をクリック→mousemoveでbottomYが変化
-    // 🔵 信頼性レベル: 重なり時の優先ルール実装に対する回帰テスト
+  test("TC-016b: topY=0, bottomY=0, trimTopY=0（重なり状態）でクリックするとtrimTopがドラッグされる", () => {
+    // 【テスト目的】: 全線が重なっている初期状態でクリックした場合、最外側のtrimTop線が掴まれること
+    // 【テスト内容】: 全線がy=0で重なる状態でy=0付近をクリック→trimTopが優先的に掴まれる
 
     const mockOnClipRegionChange = vi.fn();
+    const mockOnTrimRegionChange = vi.fn();
     const props = {
       imageData: MINIMAL_PNG_BASE64,
       imageWidth: 200,
       imageHeight: 300,
       topY: 0,
       bottomY: 0,
+      trimTopY: 0,
+      trimBottomY: 300,
       onClipRegionChange: mockOnClipRegionChange,
+      onTrimRegionChange: mockOnTrimRegionChange,
     };
 
     const { container } = render(<ImageCanvas {...props} />);
     const canvas = container.querySelector("canvas");
 
-    // 重なり位置（y=0）付近でマウスダウン → bottomYを掴むはず
+    // 重なり位置（y=0）付近でマウスダウン → trimTopが最初にマッチ
     fireEvent.mouseDown(canvas!, {
       clientX: 100,
       clientY: 2,
     });
 
-    // y=100にマウスムーブ（bottomYが下に移動するはず）
     fireEvent.mouseMove(canvas!, {
       clientX: 100,
       clientY: 100,
     });
 
-    // 【結果検証】: onClipRegionChangeが呼ばれ、topY=0のままbottomYが変化すること
-    expect(mockOnClipRegionChange).toHaveBeenCalled();
-    // bottomYドラッグなので第1引数(topY)は0のまま
-    const callArgs = mockOnClipRegionChange.mock.calls[0];
-    expect(callArgs[0]).toBe(0); // topY は変化しない
+    // trimTop線が優先的に掴まれるため、onTrimRegionChangeが呼ばれる
+    expect(mockOnTrimRegionChange).toHaveBeenCalled();
+    expect(mockOnClipRegionChange).not.toHaveBeenCalled();
   });
 });

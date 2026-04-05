@@ -33,6 +33,10 @@ export interface AppState {
   clipTopY: number; // 【フィールド】: クリップ上端のY座標
   clipBottomY: number; // 【フィールド】: クリップ下端のY座標
 
+  // 【トリム範囲】: ユーザーが指定した上下トリミング範囲
+  trimTopY: number; // 【フィールド】: トリム上端のY座標（これより上を切り取る）
+  trimBottomY: number; // 【フィールド】: トリム下端のY座標（これより下を切り取る）
+
   // 【UI状態】: ステータスとエラー情報
   status: "idle" | "loading" | "ready" | "dragging" | "saving" | "error"; // 【フィールド】: アプリの現在の状態
   errorMessage: string | null; // 【フィールド】: エラーメッセージ（エラー状態時のみ設定）
@@ -59,6 +63,7 @@ export type AppAction =
   | { type: "SAVE_SUCCESS" } // 【アクション】: 保存成功（status → 'ready'）
   | { type: "SAVE_ERROR"; payload: string } // 【アクション】: 保存エラー（status → 'error'、errorMessage設定）
   | { type: "UPDATE_CLIP_REGION"; payload: { topY: number; bottomY: number } } // 【アクション】: クリップ範囲更新（clipTopY/clipBottomY更新）
+  | { type: "UPDATE_TRIM_REGION"; payload: { trimTopY: number; trimBottomY: number } } // 【アクション】: トリム範囲更新
   | { type: "START_DRAGGING" } // 【アクション】: ドラッグ開始（status → 'dragging'）
   | { type: "END_DRAGGING" } // 【アクション】: ドラッグ終了（status → 'ready'）
   | { type: "RESET_ERROR" }; // 【アクション】: エラーリセット（errorMessage → null）
@@ -83,6 +88,8 @@ export const initialState: AppState = {
   // 【クリップ範囲の初期値】: 0,0（画像未読込なのでデフォルト値）
   clipTopY: 0, // 【初期値】: クリップ上端Y=0
   clipBottomY: 0, // 【初期値】: クリップ下端Y=0（画像未読込時は0）
+  trimTopY: 0, // 【初期値】: トリム上端Y=0（トリムなし）
+  trimBottomY: 0, // 【初期値】: トリム下端Y=0（画像未読込時は0）
 
   // 【UI状態の初期値】: アプリ起動直後
   status: "idle", // 【初期値】: idle（待機状態）
@@ -124,6 +131,8 @@ export function appReducer(state: AppState, action: AppAction): AppState {
         // 【クリップ範囲初期化】: 新しい画像のデフォルト（除去なし = 画像全体が残る）
         clipTopY: Math.round(action.payload.imageHeight * 0.25), // 【初期化】: クリップ上端を画像高さの25%に設定
         clipBottomY: Math.round(action.payload.imageHeight * 0.75), // 【初期化】: クリップ下端を画像高さの75%に設定
+        trimTopY: 0, // 【初期化】: トリム上端を0に設定（トリムなし）
+        trimBottomY: action.payload.imageHeight, // 【初期化】: トリム下端を画像高さに設定（トリムなし）
         errorMessage: null, // 【エラーリセット】: 前回のエラーメッセージをクリア
       };
 
@@ -160,8 +169,16 @@ export function appReducer(state: AppState, action: AppAction): AppState {
     case "UPDATE_CLIP_REGION":
       return {
         ...state,
-        clipTopY: action.payload.topY, // 【クリップ上端更新】: ドラッグで指定されたY座標
-        clipBottomY: action.payload.bottomY, // 【クリップ下端更新】: ドラッグで指定されたY座標
+        clipTopY: action.payload.topY,
+        clipBottomY: action.payload.bottomY,
+      };
+
+    // 【UPDATE_TRIM_REGION処理】: トリム範囲更新 → trimTopY/trimBottomY のみ更新
+    case "UPDATE_TRIM_REGION":
+      return {
+        ...state,
+        trimTopY: action.payload.trimTopY,
+        trimBottomY: action.payload.trimBottomY,
       };
 
     // 【START_DRAGGING処理】: ドラッグ開始 → status を 'dragging' に遷移
@@ -391,9 +408,11 @@ function App() {
       // 🔵 note.md「IPC連携パターン」・要件定義書2.4「clip_and_save コマンド」より
       // 🔵 TC-003対応: Rust側IPCコマンドはsnake_case引数（src_path, top_y, bottom_y, dest_path）を期待
       await invoke("clip_and_save", {
-        srcPath: state.imagePath, // 【引数名】: Tauri v2はsnake_case→camelCase自動変換
+        srcPath: state.imagePath,
         topY: Math.round(state.clipTopY),
         bottomY: Math.round(state.clipBottomY),
+        trimTopY: Math.round(state.trimTopY),
+        trimBottomY: Math.round(state.trimBottomY),
         destPath: destPath,
       });
 
@@ -408,7 +427,7 @@ function App() {
         payload: formatErrorMessage(error, "クリップ・保存エラー: "),
       });
     }
-  }, [state.imagePath, state.clipTopY, state.clipBottomY]); // 【依存配列】: IPC 呼び出しで使用する state フィールドのみ依存
+  }, [state.imagePath, state.clipTopY, state.clipBottomY, state.trimTopY, state.trimBottomY]); // 【依存配列】: IPC 呼び出しで使用する state フィールドのみ依存
 
   /**
    * 【機能概要】: ImageCanvas のドラッグ操作で変更されたクリップ範囲を受け取るコールバック
@@ -424,7 +443,17 @@ function App() {
       });
     },
     []
-  ); // 【依存配列】: dispatch は安定した参照のため依存なし
+  );
+
+  const handleTrimRegionChange = useCallback(
+    (trimTopY: number, trimBottomY: number) => {
+      dispatch({
+        type: "UPDATE_TRIM_REGION",
+        payload: { trimTopY, trimBottomY },
+      });
+    },
+    []
+  );
 
   /**
    * 【機能概要】: エラーバーの「閉じる」ボタンクリックハンドラ
@@ -489,7 +518,10 @@ function App() {
           imageHeight={state.imageHeight}
           topY={state.clipTopY}
           bottomY={state.clipBottomY}
+          trimTopY={state.trimTopY}
+          trimBottomY={state.trimBottomY}
           onClipRegionChange={handleClipRegionChange}
+          onTrimRegionChange={handleTrimRegionChange}
         />
 
         {/* 【PreviewPanel配置】: 選択範囲のリアルタイム拡大プレビュー */}
@@ -499,6 +531,8 @@ function App() {
           imageHeight={state.imageHeight}
           topY={state.clipTopY}
           bottomY={state.clipBottomY}
+          trimTopY={state.trimTopY}
+          trimBottomY={state.trimBottomY}
         />
       </div>
     </main>

@@ -46,6 +46,8 @@ describe("PreviewPanel", () => {
       imageHeight: 300,
       topY: 0,
       bottomY: 300,
+      trimTopY: 0,
+      trimBottomY: 300,
     };
 
     // 【実際の処理実行】: PreviewPanelコンポーネントをレンダリング
@@ -75,6 +77,8 @@ describe("PreviewPanel", () => {
       imageHeight: 300,
       topY: 50,
       bottomY: 250,
+      trimTopY: 0,
+      trimBottomY: 300,
     };
 
     // 【実際の処理実行】: PreviewPanelコンポーネントをレンダリング
@@ -105,6 +109,8 @@ describe("PreviewPanel", () => {
       imageHeight: 300,
       topY: 50,
       bottomY: 250,
+      trimTopY: 0,
+      trimBottomY: 300,
     };
 
     render(<PreviewPanel {...props} />);
@@ -149,6 +155,8 @@ describe("PreviewPanel", () => {
       imageHeight: 300,
       topY: 50,
       bottomY: 250,
+      trimTopY: 0,
+      trimBottomY: 300,
     };
 
     // 【実際の処理実行】: 初期レンダリング後にtopYを変更してrerender
@@ -170,6 +178,8 @@ describe("PreviewPanel", () => {
         imageHeight={300}
         topY={100}
         bottomY={250}
+        trimTopY={0}
+        trimBottomY={300}
       />
     );
 
@@ -195,6 +205,8 @@ describe("PreviewPanel", () => {
       imageHeight: 300,
       topY: 50,
       bottomY: 250,
+      trimTopY: 0,
+      trimBottomY: 300,
     };
 
     // 【実際の処理実行】: 初期レンダリング後にbottomYを変更してrerender
@@ -215,6 +227,8 @@ describe("PreviewPanel", () => {
         imageHeight={300}
         topY={50}
         bottomY={200}
+        trimTopY={0}
+        trimBottomY={300}
       />
     );
 
@@ -240,6 +254,8 @@ describe("PreviewPanel", () => {
       imageHeight: 300,
       topY: 50,
       bottomY: 250,
+      trimTopY: 0,
+      trimBottomY: 300,
     };
 
     // 【実際の処理実行】: PreviewPanelコンポーネントをレンダリング
@@ -271,6 +287,8 @@ describe("PreviewPanel", () => {
       imageHeight: 300,
       topY: 50,
       bottomY: 250,
+      trimTopY: 0,
+      trimBottomY: 300,
     };
 
     // 【実際の処理実行】: 初期レンダリング後にimageDataを変更してrerender
@@ -294,6 +312,8 @@ describe("PreviewPanel", () => {
         imageHeight={300}
         topY={50}
         bottomY={250}
+        trimTopY={0}
+        trimBottomY={300}
       />
     );
 
@@ -319,6 +339,8 @@ describe("PreviewPanel", () => {
       imageHeight: 0,
       topY: 0,
       bottomY: 0,
+      trimTopY: 0,
+      trimBottomY: 0,
     };
 
     // 【実際の処理実行】: 画像なし状態でコンポーネントをレンダリング
@@ -355,6 +377,8 @@ describe("PreviewPanel", () => {
       imageHeight: 300,
       topY: 50,
       bottomY: 250,
+      trimTopY: 0,
+      trimBottomY: 300,
     };
 
     // 【実際の処理実行】: getContext=nullの状態でコンポーネントをレンダリング
@@ -381,6 +405,8 @@ describe("PreviewPanel", () => {
       imageHeight: 300,
       topY: 100,
       bottomY: 100,
+      trimTopY: 0,
+      trimBottomY: 300,
     };
 
     expect(() => {
@@ -408,6 +434,8 @@ describe("PreviewPanel", () => {
       imageHeight: 300,
       topY: 100,
       bottomY: 101,
+      trimTopY: 0,
+      trimBottomY: 300,
     };
 
     render(<PreviewPanel {...props} />);
@@ -441,6 +469,8 @@ describe("PreviewPanel", () => {
       imageHeight: 300,
       topY: 0,
       bottomY: 0, // 除去なし
+      trimTopY: 0,
+      trimBottomY: 300,
     };
 
     render(<PreviewPanel {...props} />);
@@ -477,6 +507,8 @@ describe("PreviewPanel", () => {
       imageHeight: 3000,
       topY: 500,
       bottomY: 2500,
+      trimTopY: 0,
+      trimBottomY: 3000,
     };
 
     render(<PreviewPanel {...props} />);

@@ -95,7 +95,7 @@ fn test_clip_and_save_png_success() {
 
     // 【実際の処理実行】: clip_and_save() を呼び出す
     // 【処理内容】: top_y=20, bottom_y=80 で Y 軸方向にクロップ（60px 分）
-    let result = image_processor::clip_and_save(&src_path, 20, 80, &dest_path);
+    let result = image_processor::clip_and_save(&src_path, 20, 80, 0, 100, &dest_path);
 
     // 【結果検証】: Ok(())が返り、期待サイズで保存されていること
     // 【期待値確認】: クロップ高さ = 80 - 20 = 60px、幅はX軸全幅維持で100px
@@ -149,7 +149,7 @@ fn test_clip_and_save_jpg_success() {
 
     // 【実際の処理実行】: clip_and_save() を呼び出す
     // 【処理内容】: top_y=30, bottom_y=120 で Y 軸方向にクロップ（90px 分）
-    let result = image_processor::clip_and_save(&src_path, 30, 120, &dest_path);
+    let result = image_processor::clip_and_save(&src_path, 30, 120, 0, 150, &dest_path);
 
     // 【結果検証】: Ok(())が返り、期待サイズで保存されていること
     assert!(
@@ -198,7 +198,7 @@ fn test_clip_and_save_equal_y_range_no_removal() {
     create_test_png(&src_path, 100, 100);
     let dest_path = output_path("tc103_result.png");
 
-    let result = image_processor::clip_and_save(&src_path, 50, 50, &dest_path);
+    let result = image_processor::clip_and_save(&src_path, 50, 50, 0, 100, &dest_path);
 
     assert!(
         result.is_ok(),
@@ -233,7 +233,7 @@ fn test_clip_and_save_invalid_y_range_reversed() {
 
     // 【実際の処理実行】: top_y=80, bottom_y=20（逆転）でclip_and_saveを呼び出す
     // 【処理内容】: top_y > bottom_y のバリデーションチェックが優先してErrを返す
-    let result = image_processor::clip_and_save(&src_path, 80, 20, &dest_path);
+    let result = image_processor::clip_and_save(&src_path, 80, 20, 0, 100, &dest_path);
 
     // 【結果検証】: Err が返ること
     assert!(result.is_err(), "top_y > bottom_y でErrが返らなかった"); // 【確認内容】: Errが返ること 🔵
@@ -265,7 +265,7 @@ fn test_clip_and_save_bottom_y_exceeds_height() {
 
     // 【実際の処理実行】: bottom_y=120（画像高さ100pxを超える）でclip_and_saveを呼び出す
     // 【処理内容】: 画像読み込み後、bottom_y > height のバリデーションチェックでErrを返す
-    let result = image_processor::clip_and_save(&src_path, 10, 120, &dest_path);
+    let result = image_processor::clip_and_save(&src_path, 10, 120, 0, 120, &dest_path);
 
     // 【結果検証】: Err が返ること
     assert!(result.is_err(), "bottom_y > height でErrが返らなかった"); // 【確認内容】: Errが返ること 🔵
@@ -296,7 +296,7 @@ fn test_clip_and_save_source_not_found() {
 
     // 【実際の処理実行】: 存在しないパスでclip_and_saveを呼び出す
     // 【処理内容】: image::open() がファイルオープンエラーを返し、map_err でString化
-    let result = image_processor::clip_and_save(src_path, 10, 50, &dest_path);
+    let result = image_processor::clip_and_save(src_path, 10, 50, 0, 100, &dest_path);
 
     // 【結果検証】: Err が返ること
     assert!(result.is_err(), "存在しないファイルでErrが返らなかった"); // 【確認内容】: パニックせずErrが返ること 🔵
@@ -328,7 +328,7 @@ fn test_clip_and_save_save_permission_denied() {
 
     // 【実際の処理実行】: 存在しないディレクトリへの保存先パスでclip_and_saveを呼び出す
     // 【処理内容】: クロップ処理は成功するが、save_with_format() がディレクトリ不在でエラー
-    let result = image_processor::clip_and_save(&src_path, 10, 50, dest_path);
+    let result = image_processor::clip_and_save(&src_path, 10, 50, 0, 100, dest_path);
 
     // 【結果検証】: Err が返ること
     assert!(
@@ -363,7 +363,7 @@ fn test_clip_and_save_format_detection_png() {
 
     // 【実際の処理実行】: .png 拡張子の保存先パスでclip_and_saveを呼び出す
     // 【処理内容】: 拡張子 .png から PNG 形式として save_with_format(ImageFormat::Png) で保存
-    let result = image_processor::clip_and_save(&src_path, 20, 80, &dest_path);
+    let result = image_processor::clip_and_save(&src_path, 20, 80, 0, 100, &dest_path);
     assert!(result.is_ok(), "PNG形式保存がOkでない: {:?}", result);
 
     // 【結果検証】: 保存ファイルの先頭バイトが PNG シグネチャであること
@@ -399,7 +399,7 @@ fn test_clip_and_save_format_detection_jpg() {
 
     // 【実際の処理実行】: .jpg 拡張子の保存先パスでclip_and_saveを呼び出す
     // 【処理内容】: 拡張子 .jpg から JPEG 形式として save_with_format(ImageFormat::Jpeg) で保存
-    let result = image_processor::clip_and_save(&src_path, 20, 80, &dest_path);
+    let result = image_processor::clip_and_save(&src_path, 20, 80, 0, 100, &dest_path);
     assert!(result.is_ok(), "JPG形式保存がOkでない: {:?}", result);
 
     // 【結果検証】: 保存ファイルの先頭バイトが JPEG シグネチャであること
@@ -435,7 +435,7 @@ fn test_clip_and_save_format_detection_jpeg() {
 
     // 【実際の処理実行】: .jpeg 拡張子の保存先パスでclip_and_saveを呼び出す
     // 【処理内容】: 拡張子 .jpeg から JPEG 形式として save_with_format(ImageFormat::Jpeg) で保存
-    let result = image_processor::clip_and_save(&src_path, 20, 80, &dest_path);
+    let result = image_processor::clip_and_save(&src_path, 20, 80, 0, 100, &dest_path);
     assert!(result.is_ok(), "JPEG形式保存がOkでない: {:?}", result);
 
     // 【結果検証】: 保存ファイルの先頭バイトが JPEG シグネチャであること
@@ -470,7 +470,7 @@ fn test_clip_and_save_top_y_zero() {
 
     // 【実際の処理実行】: top_y=0 の境界値でclip_and_saveを呼び出す
     // 【処理内容】: crop_imm(0, 0, 100, 50) で画像上端から50pxをクロップ
-    let result = image_processor::clip_and_save(&src_path, 0, 50, &dest_path);
+    let result = image_processor::clip_and_save(&src_path, 0, 50, 0, 100, &dest_path);
 
     // 【結果検証】: Ok(())が返ること
     assert!(result.is_ok(), "top_y=0 でOkが返らなかった: {:?}", result); // 【確認内容】: Ok(())が返ること 🟡
@@ -507,7 +507,7 @@ fn test_clip_and_save_bottom_y_equals_height() {
 
     // 【実際の処理実行】: bottom_y == height の境界値でclip_and_saveを呼び出す
     // 【処理内容】: crop_imm(0, 50, 100, 50) で画像下端まで正確にクロップ
-    let result = image_processor::clip_and_save(&src_path, 50, 100, &dest_path);
+    let result = image_processor::clip_and_save(&src_path, 50, 100, 0, 100, &dest_path);
 
     // 【結果検証】: Ok(())が返ること（bottom_y == height はエラーでない）
     assert!(
@@ -548,7 +548,7 @@ fn test_clip_and_save_minimum_crop_height_1px() {
 
     // 【実際の処理実行】: クロップ高さ1pxの最小有効範囲でclip_and_saveを呼び出す
     // 【処理内容】: crop_imm(0, 49, 100, 1) で1pxの高さをクロップ
-    let result = image_processor::clip_and_save(&src_path, 49, 50, &dest_path);
+    let result = image_processor::clip_and_save(&src_path, 49, 50, 0, 100, &dest_path);
 
     // 【結果検証】: Ok(())が返ること
     assert!(
@@ -589,7 +589,7 @@ fn test_clip_and_save_format_detection_uppercase_jpg() {
 
     // 【実際の処理実行】: .JPG（大文字）拡張子の保存先パスでclip_and_saveを呼び出す
     // 【処理内容】: to_lowercase()で .jpg に正規化され、JPEG形式として判定・保存
-    let result = image_processor::clip_and_save(&src_path, 20, 80, &dest_path);
+    let result = image_processor::clip_and_save(&src_path, 20, 80, 0, 100, &dest_path);
     assert!(
         result.is_ok(),
         "大文字JPG拡張子での保存がOkでない: {:?}",
@@ -624,7 +624,7 @@ fn test_clip_and_save_full_removal_error() {
     create_test_png(&src_path, 100, 100);
     let dest_path = output_path("tc114_result.png");
 
-    let result = image_processor::clip_and_save(&src_path, 0, 100, &dest_path);
+    let result = image_processor::clip_and_save(&src_path, 0, 100, 0, 100, &dest_path);
 
     assert!(result.is_err(), "全除去ケースでErrが返らなかった");
 
@@ -662,7 +662,7 @@ fn test_clip_and_save_gif_source_unsupported_format() {
 
     // 【実際の処理実行】: GIF ファイルをソースとして clip_and_save を呼び出す
     // 【処理内容】: ソース形式バリデーションで GIF を検出 → Err を返すべき（現行実装では Ok(()) が返る）
-    let result = image_processor::clip_and_save(&src_path, 0, 1, &dest_path);
+    let result = image_processor::clip_and_save(&src_path, 0, 1, 0, 100, &dest_path);
     let _ = std::fs::remove_file(&dest_path); // クリーンアップ
 
     // 【結果検証】: Err(String) が返ることを確認（現行実装では Ok(()) が返るため RED になる）

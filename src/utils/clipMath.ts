@@ -28,24 +28,36 @@ export function clamp(value: number, min: number, max: number): number {
  * @param bottomY - 現在の下端Y座標（クランプ上限として使用）
  * @returns クランプ後のtopY（0 <= result <= bottomY - 1）
  */
-export function clampTopY(y: number, bottomY: number): number {
-  // 【クランプ上限】: topY <= bottomY を許可（topY === bottomY は除去なし = 元画像そのまま） 🔵
-  return clamp(y, 0, bottomY);
+export function clampTopY(y: number, trimTopY: number, bottomY: number): number {
+  return clamp(y, trimTopY, bottomY);
 }
 
 /**
  * 【ヘルパー関数】: bottomY ドラッグ時のY座標クランプ
  * 【制約】:
- *   - bottomY <= imageHeight（画像下端）
- *   - topY < bottomY（上端線との交差防止）
- * 【再利用性】: useClipRegion.updateDrag と ImageCanvas.handleMouseMove の両方で使用
- * 🔵 信頼性レベル: 要件定義の座標制約・Greenフェーズの重複ロジックより
+ *   - topY <= bottomY（上端線との交差防止）
+ *   - bottomY <= trimBottomY（トリム下端線との交差防止）
  * @param y - ドラッグ中のY座標
  * @param topY - 現在の上端Y座標（クランプ下限として使用）
- * @param imageHeight - 画像の高さ（クランプ上限として使用）
- * @returns クランプ後のbottomY（topY + 1 <= result <= imageHeight）
+ * @param trimBottomY - トリム下端Y座標（クランプ上限として使用）
+ * @returns クランプ後のbottomY
  */
-export function clampBottomY(y: number, topY: number, imageHeight: number): number {
-  // 【クランプ下限】: topY <= bottomY を許可（topY === bottomY は除去なし = 元画像そのまま） 🔵
-  return clamp(y, topY, imageHeight);
+export function clampBottomY(y: number, topY: number, trimBottomY: number): number {
+  return clamp(y, topY, trimBottomY);
+}
+
+/**
+ * 【ヘルパー関数】: trimTopY ドラッグ時のY座標クランプ
+ * 【制約】: 0 <= trimTopY <= clipTopY
+ */
+export function clampTrimTopY(y: number, clipTopY: number): number {
+  return clamp(y, 0, clipTopY);
+}
+
+/**
+ * 【ヘルパー関数】: trimBottomY ドラッグ時のY座標クランプ
+ * 【制約】: clipBottomY <= trimBottomY <= imageHeight
+ */
+export function clampTrimBottomY(y: number, clipBottomY: number, imageHeight: number): number {
+  return clamp(y, clipBottomY, imageHeight);
 }

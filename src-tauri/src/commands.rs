@@ -15,13 +15,15 @@ pub fn load_image(path: String) -> Result<ImageMetadata, String> {
     image_processor::load_image(&path)
 }
 
-/// 指定範囲でクリップして保存する
+/// 指定範囲でトリム+クリップして保存する
 #[tauri::command]
 pub fn clip_and_save(
     src_path: String,
     top_y: u32,
     bottom_y: u32,
+    trim_top_y: u32,
+    trim_bottom_y: u32,
     dest_path: String,
 ) -> Result<(), String> {
-    image_processor::clip_and_save(&src_path, top_y, bottom_y, &dest_path)
+    image_processor::clip_and_save(&src_path, top_y, bottom_y, trim_top_y, trim_bottom_y, &dest_path)
 }

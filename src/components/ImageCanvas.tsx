@@ -4,22 +4,19 @@
 
 import React, { useRef, useEffect, useState } from "react";
 import type { DraggingLine } from "../types/clip";
-import { clampTopY, clampBottomY } from "../utils/clipMath";
+import { clampTopY, clampBottomY, clampTrimTopY, clampTrimBottomY } from "../utils/clipMath";
 
 // 【インターフェース定義】: ImageCanvasコンポーネントのPropsを定義 🔵
 interface IImageCanvasProps {
-  /** Base64エンコード済み画像データ（nullの場合は空Canvas表示） */
   imageData: string | null;
-  /** 画像の幅（px） */
   imageWidth: number;
-  /** 画像の高さ（px） */
   imageHeight: number;
-  /** クリップ上端のY座標（px） */
   topY: number;
-  /** クリップ下端のY座標（px） */
   bottomY: number;
-  /** クリップ範囲変更時のコールバック（topY, bottomYを引数に親コンポーネントへ通知） */
+  trimTopY: number;
+  trimBottomY: number;
   onClipRegionChange: (topY: number, bottomY: number) => void;
+  onTrimRegionChange: (trimTopY: number, trimBottomY: number) => void;
 }
 
 // 【定数定義】: 水平線のドラッグ可能範囲（線の上下 ±DRAG_THRESHOLD px 以内） 🔵
@@ -59,16 +56,26 @@ function drawBackgroundImage(
 function drawOverlay(
   ctx: CanvasRenderingContext2D,
   imageWidth: number,
-  _imageHeight: number,
-  topY: number,
-  bottomY: number
+  imageHeight: number,
+  trimTopY: number,
+  clipTopY: number,
+  clipBottomY: number,
+  trimBottomY: number
 ): void {
   ctx.fillStyle = OVERLAY_COLOR;
 
-  // 【中央マスク】: y=topY から y=bottomY まで半透明で塗りつぶし（除去される範囲） 🔵
-  const middleHeight = bottomY - topY;
-  if (middleHeight > 0) {
-    ctx.fillRect(0, topY, imageWidth, middleHeight);
+  // 上トリム領域: 0..trimTopY
+  if (trimTopY > 0) {
+    ctx.fillRect(0, 0, imageWidth, trimTopY);
+  }
+  // クリップ除去領域: clipTopY..clipBottomY
+  const clipHeight = clipBottomY - clipTopY;
+  if (clipHeight > 0) {
+    ctx.fillRect(0, clipTopY, imageWidth, clipHeight);
+  }
+  // 下トリム領域: trimBottomY..imageHeight
+  if (trimBottomY < imageHeight) {
+    ctx.fillRect(0, trimBottomY, imageWidth, imageHeight - trimBottomY);
   }
 }
 
@@ -77,26 +84,23 @@ function drawOverlay(
  * 【単一責任】: 水平線描画のみを担当（上端線・下端線の2本）
  * 🔵 信頼性レベル: タスクノートのCanvas描画フロー「3. 水平線層」より
  */
-function drawClipLines(
+function drawAllLines(
   ctx: CanvasRenderingContext2D,
   imageWidth: number,
-  topY: number,
-  bottomY: number
+  trimTopY: number,
+  clipTopY: number,
+  clipBottomY: number,
+  trimBottomY: number
 ): void {
   ctx.strokeStyle = LINE_COLOR;
   ctx.lineWidth = LINE_WIDTH;
 
-  // 【上端線描画】: topY 位置に水平線を描画 🔵
-  ctx.beginPath();
-  ctx.moveTo(0, topY);
-  ctx.lineTo(imageWidth, topY);
-  ctx.stroke();
-
-  // 【下端線描画】: bottomY 位置に水平線を描画 🔵
-  ctx.beginPath();
-  ctx.moveTo(0, bottomY);
-  ctx.lineTo(imageWidth, bottomY);
-  ctx.stroke();
+  for (const y of [trimTopY, clipTopY, clipBottomY, trimBottomY]) {
+    ctx.beginPath();
+    ctx.moveTo(0, y);
+    ctx.lineTo(imageWidth, y);
+    ctx.stroke();
+  }
 }
 
 // ------------------------------------------------------------
@@ -123,7 +127,10 @@ const ImageCanvas: React.FC<IImageCanvasProps> = ({
   imageHeight,
   topY,
   bottomY,
+  trimTopY,
+  trimBottomY,
   onClipRegionChange,
+  onTrimRegionChange,
 }) => {
   // 【Ref定義】: Canvas要素への参照（Canvas API操作のために使用） 🔵
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -160,14 +167,12 @@ const ImageCanvas: React.FC<IImageCanvasProps> = ({
     // 【理由】: Image.srcの設定は非同期のため、onloadイベント内でCanvasに描画する必要がある
     const image = new Image();
     image.onload = () => {
-      // 【段階的描画】: 描画ヘルパー関数を呼び出して各レイヤーを順番に描画 🔵
-      // 1. 背景画像 → 2. オーバーレイ → 3. 水平線 の順で描画
       drawBackgroundImage(ctx, image);
-      drawOverlay(ctx, imageWidth, imageHeight, topY, bottomY);
-      drawClipLines(ctx, imageWidth, topY, bottomY);
+      drawOverlay(ctx, imageWidth, imageHeight, trimTopY, topY, bottomY, trimBottomY);
+      drawAllLines(ctx, imageWidth, trimTopY, topY, bottomY, trimBottomY);
     };
     image.src = imageData;
-  }, [imageData, imageWidth, imageHeight, topY, bottomY]);
+  }, [imageData, imageWidth, imageHeight, topY, bottomY, trimTopY, trimBottomY]);
 
   // ------------------------------------------------------------
   // マウスイベントハンドラ
@@ -183,36 +188,26 @@ const ImageCanvas: React.FC<IImageCanvasProps> = ({
     const canvas = canvasRef.current;
     if (!canvas) return;
 
-    // 【Canvas座標変換】: クライアント座標をCanvas上のY座標に変換 🔵
-    // 【理由】: Canvas要素のDOMオフセットを考慮してマウス位置を正確に取得する
     const rect = canvas.getBoundingClientRect();
     const mouseY = e.clientY - rect.top;
 
-    if (topY === bottomY) {
-      // 【重なり時】: 両線が同じ位置 → クリック方向で判定 🔵
-      // 線が画像上端(0)にある場合やマウスが線位置以上なら bottomY を掴む（下に広げる操作が自然）
-      if (Math.abs(mouseY - topY) <= DRAG_THRESHOLD) {
-        const line = (topY === 0 || mouseY >= topY) ? "bottom" : "top";
+    // 4本の線をヒットテスト（外側のトリム線を優先）
+    // 線が重なっている場合、外側のトリム線を掴む方が自然な操作になる
+    // 外側のトリム線を優先: trimTop > top, trimBottom > bottom
+    const lines: { y: number; line: NonNullable<DraggingLine> }[] = [
+      { y: trimTopY, line: "trimTop" },
+      { y: topY, line: "top" },
+      { y: trimBottomY, line: "trimBottom" },
+      { y: bottomY, line: "bottom" },
+    ];
+
+    for (const { y, line } of lines) {
+      if (Math.abs(mouseY - y) <= DRAG_THRESHOLD) {
         setDraggingLine(line);
         setIsDragging(true);
         return;
       }
-    } else {
-      // 【通常時】: 既存ロジック（近い方を掴む） 🔵
-      if (Math.abs(mouseY - topY) <= DRAG_THRESHOLD) {
-        setDraggingLine("top");
-        setIsDragging(true);
-        return;
-      }
-
-      if (Math.abs(mouseY - bottomY) <= DRAG_THRESHOLD) {
-        setDraggingLine("bottom");
-        setIsDragging(true);
-        return;
-      }
     }
-
-    // 【範囲外処理】: 水平線から離れた場所のクリックは何もしない（ドラッグ開始しない） 🔵
   };
 
   /**
@@ -244,18 +239,21 @@ const ImageCanvas: React.FC<IImageCanvasProps> = ({
       cancelAnimationFrame(rafIdRef.current);
     }
 
-    // 【rAFスケジュール】: 次の描画フレームでクリップ範囲を更新 🔵
     rafIdRef.current = requestAnimationFrame(() => {
       rafIdRef.current = null;
 
-      if (draggingLine === "top") {
-        // 【topY更新処理】: clampTopY で 0〜(bottomY-1) の範囲にクランプして通知 🔵
-        const newTopY = clampTopY(mouseY, bottomY);
+      if (draggingLine === "trimTop") {
+        const newTrimTopY = clampTrimTopY(mouseY, topY);
+        onTrimRegionChange(newTrimTopY, trimBottomY);
+      } else if (draggingLine === "top") {
+        const newTopY = clampTopY(mouseY, trimTopY, bottomY);
         onClipRegionChange(newTopY, bottomY);
-      } else {
-        // 【bottomY更新処理】: clampBottomY で (topY+1)〜imageHeight の範囲にクランプして通知 🔵
-        const newBottomY = clampBottomY(mouseY, topY, imageHeight);
+      } else if (draggingLine === "bottom") {
+        const newBottomY = clampBottomY(mouseY, topY, trimBottomY);
         onClipRegionChange(topY, newBottomY);
+      } else if (draggingLine === "trimBottom") {
+        const newTrimBottomY = clampTrimBottomY(mouseY, bottomY, imageHeight);
+        onTrimRegionChange(trimTopY, newTrimBottomY);
       }
     });
   };

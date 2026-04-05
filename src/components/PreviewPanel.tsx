@@ -12,21 +12,13 @@ import React, { useRef, useEffect } from "react";
 // 【インターフェース定義】: PreviewPanelコンポーネントのPropsを定義 🔵
 // 【参照元】: 要件定義書 セクション2「入力パラメータ（Props）」・note.md「コーディング規約」
 interface IPreviewPanelProps {
-  /** Base64エンコード済み画像データ（nullの場合はプレビューなし） */
   imageData: string | null;
-  /** 画像の幅（px） */
   imageWidth: number;
-  /**
-   * 画像の高さ（px）
-   * 【設計メモ】: 現在の実装では drawImage のソース範囲指定に imageWidth のみ使用し、
-   * imageHeight は将来の拡張（アスペクト比計算・Canvas動的サイズ変更等）に備えて
-   * props として定義・受け取りを行う。
-   */
   imageHeight: number;
-  /** クリップ上端のY座標（px）。0 <= topY < bottomY */
   topY: number;
-  /** クリップ下端のY座標（px）。topY < bottomY <= imageHeight */
   bottomY: number;
+  trimTopY: number;
+  trimBottomY: number;
 }
 
 // （PREVIEW_WIDTH は廃止: Canvas幅は imageWidth をそのまま使用する）
@@ -45,12 +37,17 @@ const PreviewPanel: React.FC<IPreviewPanelProps> = ({
   imageHeight,
   topY,
   bottomY,
+  trimTopY,
+  trimBottomY,
 }) => {
   // 【Ref定義1】: Canvas要素への参照（Canvas API操作のために使用） 🔵
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
-  // 【動的Canvas高さ計算】: クリップ結果の実際のアスペクト比に基づいてCanvas高さを算出
-  const keptHeight = topY + (imageHeight - bottomY);
+  // 【動的Canvas高さ計算】: トリム+クリップ結果の実際のアスペクト比に基づいてCanvas高さを算出
+  // 残る部分: [trimTopY..clipTopY] + [clipBottomY..trimBottomY]
+  const topPartHeight = topY - trimTopY;
+  const bottomPartHeight = trimBottomY - bottomY;
+  const keptHeight = topPartHeight + bottomPartHeight;
   const canvasHeight = keptHeight > 0 ? keptHeight : imageHeight;
 
   // 【Ref定義2】: ロード済み Image オブジェクトのキャッシュ 🔵
@@ -80,11 +77,11 @@ const PreviewPanel: React.FC<IPreviewPanelProps> = ({
     const ctx = canvas.getContext("2d");
     if (!ctx) return;
 
-    // 【残存高さ計算】: 上部(0..topY) + 下部(bottomY..imageHeight) の合計がゼロ以下なら描画スキップ 🔵
-    const topPartHeight = topY;
-    const bottomPartHeight = imageHeight - bottomY;
-    const keptHeight = topPartHeight + bottomPartHeight;
-    if (keptHeight <= 0) return;
+    // 【残存高さ計算】: [trimTopY..clipTopY] + [clipBottomY..trimBottomY] がゼロ以下なら描画スキップ
+    const localTopPartHeight = topY - trimTopY;
+    const localBottomPartHeight = trimBottomY - bottomY;
+    const localKeptHeight = localTopPartHeight + localBottomPartHeight;
+    if (localKeptHeight <= 0) return;
 
     /**
      * 【ヘルパー関数】: ロード済み Image を Canvas に上下結合して拡大描画する
@@ -97,21 +94,21 @@ const PreviewPanel: React.FC<IPreviewPanelProps> = ({
       // 【Canvas クリア】: 前回の描画内容を削除して再描画の準備 🔵
       ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-      // 【上下結合プレビュー描画】: 中央を除去した上部+下部を結合して描画 🔵
-      const topCanvasH = (topPartHeight / keptHeight) * canvas.height;
-      const bottomCanvasH = (bottomPartHeight / keptHeight) * canvas.height;
+      // トリム+クリップ結合プレビュー: [trimTopY..clipTopY] + [clipBottomY..trimBottomY]
+      const topCanvasH = (localTopPartHeight / localKeptHeight) * canvas.height;
+      const bottomCanvasH = (localBottomPartHeight / localKeptHeight) * canvas.height;
 
-      if (topPartHeight > 0) {
+      if (localTopPartHeight > 0) {
         ctx.drawImage(
           img,
-          0, 0, imageWidth, topPartHeight,
+          0, trimTopY, imageWidth, localTopPartHeight,
           0, 0, canvas.width, topCanvasH,
         );
       }
-      if (bottomPartHeight > 0) {
+      if (localBottomPartHeight > 0) {
         ctx.drawImage(
           img,
-          0, bottomY, imageWidth, bottomPartHeight,
+          0, bottomY, imageWidth, localBottomPartHeight,
           0, topCanvasH, canvas.width, bottomCanvasH,
         );
       }
@@ -154,7 +151,7 @@ const PreviewPanel: React.FC<IPreviewPanelProps> = ({
       //           Canvas への drawImage 呼び出しを防ぐ
       img.onload = null;
     };
-  }, [imageData, imageWidth, imageHeight, topY, bottomY]); // 【依存配列】: 変更時に再描画（TC-004, TC-005, TC-007対応） 🔵
+  }, [imageData, imageWidth, imageHeight, topY, bottomY, trimTopY, trimBottomY]); // 【依存配列】: 変更時に再描画（TC-004, TC-005, TC-007対応） 🔵
 
   // 【レンダリング】: Canvas要素を描画 🔵
   // 【属性設定】:

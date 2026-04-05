@@ -151,6 +151,8 @@ describe("App 統合テスト（TASK-0007 TC-001〜TC-018）", () => {
         src_path: sampleImagePath, // 【確認内容】: src_path（snake_case）で渡される 🔵
         top_y: 0,                  // 【確認内容】: top_y（snake_case）で渡される 🔵
         bottom_y: 0,               // 【確認内容】: bottom_y=0（除去なし初期値） 🔵
+        trim_top_y: 0,             // 【確認内容】: trim_top_y=0（トリムなし初期値）
+        trim_bottom_y: 0,          // 【確認内容】: trim_bottom_y=imageHeight（トリムなし初期値）
         dest_path: sampleImagePath, // 【確認内容】: overwriteモードでは元画像パスに上書き 🔵
       });
     });
@@ -574,6 +576,8 @@ describe("App 統合テスト（TASK-0007 TC-001〜TC-018）", () => {
         src_path: sampleImagePath, // 【確認内容】: snake_case引数 src_path 🟡
         top_y: 0,                  // 【確認内容】: top_y=0（初期値） 🟡
         bottom_y: 0,               // 【確認内容】: bottom_y=0（除去なし初期値） 🟡
+        trim_top_y: 0,             // 【確認内容】: trim_top_y=0（トリムなし初期値） 🟡
+        trim_bottom_y: 0,          // 【確認内容】: trim_bottom_y=imageHeight（トリムなし初期値） 🟡
         dest_path: sampleImagePath, // 【確認内容】: overwriteモードでは元画像パスに上書き 🟡
       });
     });

@@ -134,12 +134,19 @@ pub fn clip_and_save(
     src_path: &str,
     top_y: u32,
     bottom_y: u32,
+    trim_top_y: u32,
+    trim_bottom_y: u32,
     dest_path: &str,
 ) -> Result<(), String> {
-    // 【Y座標バリデーション】: 画像読み込み前に早期チェック。
-    // top_y > bottom_y（逆転）は無効。top_y == bottom_y は「除去なし = 元画像そのまま」として許可。 🔵
+    // 【座標バリデーション】: trim_top_y <= top_y <= bottom_y <= trim_bottom_y
+    if trim_top_y > top_y {
+        return Err("トリム上端Y座標はクリップ上端Y座標以下である必要があります".to_string());
+    }
     if top_y > bottom_y {
         return Err("上端Y座標は下端Y座標以下である必要があります".to_string());
+    }
+    if bottom_y > trim_bottom_y {
+        return Err("クリップ下端Y座標はトリム下端Y座標以下である必要があります".to_string());
     }
 
     // 【ソース形式バリデーション】: load_image と同様に ImageReader::with_guessed_format() を使用する。
@@ -171,30 +178,30 @@ pub fn clip_and_save(
     // 【画像サイズバリデーション】: デコード後に bottom_y が画像高さを超えていないかチェック。 🔵
     // このチェックは画像読み込み後でないと高さが取得できないため、ここで実施する。
     let (width, height) = img.dimensions();
-    if bottom_y > height {
+    if trim_bottom_y > height {
         return Err(format!(
-            "下端Y座標 {} が画像の高さ {} を超えています",
-            bottom_y, height
+            "トリム下端Y座標 {} が画像の高さ {} を超えています",
+            trim_bottom_y, height
         ));
     }
 
-    // 【くり抜き処理】: 中央部分（top_y..bottom_y）を除去し、上部(0..top_y) + 下部(bottom_y..height) を結合する。 🔵
-    let top_height = top_y;
-    let bottom_height = height - bottom_y;
+    // 【トリム+クリップ処理】: 残る部分 = [trim_top_y..top_y] + [bottom_y..trim_bottom_y]
+    let top_height = top_y - trim_top_y;
+    let bottom_height = trim_bottom_y - bottom_y;
     let new_height = top_height + bottom_height;
 
     if new_height == 0 {
         return Err("除去範囲が画像全体のため出力画像がありません".to_string());
     }
 
-    let output = if top_y == bottom_y {
-        // 【除去なし】: top_y == bottom_y の場合は元画像をそのまま使用
+    let output = if top_y == bottom_y && trim_top_y == 0 && trim_bottom_y == height {
+        // 【変更なし】: クリップもトリムもない場合は元画像をそのまま使用
         img
     } else {
         use image::GenericImage;
         let mut output = image::DynamicImage::new_rgba8(width, new_height);
         if top_height > 0 {
-            let top_part = img.crop_imm(0, 0, width, top_height);
+            let top_part = img.crop_imm(0, trim_top_y, width, top_height);
             output
                 .copy_from(&top_part, 0, 0)
                 .map_err(|e| format!("画像の結合に失敗しました: {}", e))?;
