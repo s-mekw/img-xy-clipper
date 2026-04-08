@@ -170,7 +170,7 @@ function drawMagnifier(
   srcY = Math.max(0, Math.min(srcY, imageHeight - sourceSize));
 
   // メインcanvasからソース領域を拡大描画
-  ctx.imageSmoothingEnabled = true;
+  ctx.imageSmoothingEnabled = false;
   ctx.drawImage(
     sourceCanvas,
     srcX, srcY, sourceSize, sourceSize,
