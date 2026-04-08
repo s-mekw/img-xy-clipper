@@ -36,6 +36,12 @@ const LINE_WIDTH = 2;
 const FILL_COLOR = "#fffdea";
 const VERTICAL_LINE_COLOR = "#0000FF";
 
+// 拡大鏡（マグニファイア）関連定数
+const MAGNIFIER_SIZE = 140;
+const MAGNIFIER_ZOOM = 3.5;
+const MAGNIFIER_OFFSET_X = 20;
+const MAGNIFIER_OFFSET_Y = -70;
+
 // ------------------------------------------------------------
 // Canvas描画ヘルパー関数（onloadコールバックの分割）
 // ------------------------------------------------------------
@@ -138,6 +144,98 @@ function drawVerticalLine(
   ctx.stroke();
 }
 
+/**
+ * 【ヘルパー関数】: 拡大鏡canvasにマウス周辺の拡大画像を描画する
+ */
+function drawMagnifier(
+  magnifierCanvas: HTMLCanvasElement,
+  sourceCanvas: HTMLCanvasElement,
+  mouseX: number,
+  mouseY: number,
+  imageWidth: number,
+  imageHeight: number
+): void {
+  const ctx = magnifierCanvas.getContext("2d");
+  if (!ctx) return;
+
+  ctx.clearRect(0, 0, MAGNIFIER_SIZE, MAGNIFIER_SIZE);
+
+  // ソース矩形の計算（拡大前の領域サイズ）
+  const sourceSize = MAGNIFIER_SIZE / MAGNIFIER_ZOOM;
+  let srcX = mouseX - sourceSize / 2;
+  let srcY = mouseY - sourceSize / 2;
+
+  // エッジクランプ
+  srcX = Math.max(0, Math.min(srcX, imageWidth - sourceSize));
+  srcY = Math.max(0, Math.min(srcY, imageHeight - sourceSize));
+
+  // メインcanvasからソース領域を拡大描画
+  ctx.imageSmoothingEnabled = true;
+  ctx.drawImage(
+    sourceCanvas,
+    srcX, srcY, sourceSize, sourceSize,
+    0, 0, MAGNIFIER_SIZE, MAGNIFIER_SIZE
+  );
+
+  // 全幅クロスヘア（十字線）
+  const center = MAGNIFIER_SIZE / 2;
+  ctx.strokeStyle = "rgba(255, 0, 0, 0.5)";
+  ctx.lineWidth = 1;
+
+  // 水平線
+  ctx.beginPath();
+  ctx.moveTo(0, center);
+  ctx.lineTo(MAGNIFIER_SIZE, center);
+  ctx.stroke();
+
+  // 垂直線
+  ctx.beginPath();
+  ctx.moveTo(center, 0);
+  ctx.lineTo(center, MAGNIFIER_SIZE);
+  ctx.stroke();
+}
+
+/**
+ * 【ヘルパー関数】: 拡大鏡と座標ラベルの位置を更新する
+ */
+function updateMagnifierPosition(
+  magnifierCanvas: HTMLCanvasElement,
+  coordLabel: HTMLDivElement,
+  mouseX: number,
+  mouseY: number,
+  imageWidth: number,
+  imageHeight: number,
+  draggingLine: string,
+  coordValue: number
+): void {
+  // デフォルト: カーソルの右上
+  let magX = mouseX + MAGNIFIER_OFFSET_X;
+  let magY = mouseY + MAGNIFIER_OFFSET_Y;
+
+  // エッジフリップ
+  if (magX + MAGNIFIER_SIZE > imageWidth) {
+    magX = mouseX - MAGNIFIER_SIZE - MAGNIFIER_OFFSET_X;
+  }
+  if (magY < 0) {
+    magY = mouseY + 20;
+  }
+  if (magY + MAGNIFIER_SIZE + 20 > imageHeight) {
+    magY = imageHeight - MAGNIFIER_SIZE - 20;
+  }
+
+  magnifierCanvas.style.left = `${magX}px`;
+  magnifierCanvas.style.top = `${magY}px`;
+
+  // 座標ラベル: 拡大鏡の直下中央
+  const labelText = draggingLine === "fillRightX"
+    ? `X: ${Math.round(coordValue)}px`
+    : `Y: ${Math.round(coordValue)}px`;
+  coordLabel.textContent = labelText;
+  coordLabel.style.left = `${magX + MAGNIFIER_SIZE / 2}px`;
+  coordLabel.style.top = `${magY + MAGNIFIER_SIZE + 4}px`;
+  coordLabel.style.transform = "translateX(-50%)";
+}
+
 // ------------------------------------------------------------
 // ImageCanvas コンポーネント
 // ------------------------------------------------------------
@@ -181,6 +279,10 @@ const ImageCanvas: React.FC<IImageCanvasProps> = ({
   // 【Ref定義】: requestAnimationFrame のID（クリーンアップ用） 🔵
   // 【理由】: useRef で保持することで stale closure 問題を回避
   const rafIdRef = useRef<number | null>(null);
+
+  // 拡大鏡用Ref
+  const magnifierCanvasRef = useRef<HTMLCanvasElement>(null);
+  const coordLabelRef = useRef<HTMLDivElement>(null);
 
   // ------------------------------------------------------------
   // Canvas描画エフェクト
@@ -290,21 +392,41 @@ const ImageCanvas: React.FC<IImageCanvasProps> = ({
     rafIdRef.current = requestAnimationFrame(() => {
       rafIdRef.current = null;
 
+      let coordValue = mouseY;
       if (draggingLine === "trimTop") {
         const newTrimTopY = clampTrimTopY(mouseY, topY);
         onTrimRegionChange(newTrimTopY, trimBottomY);
+        coordValue = newTrimTopY;
       } else if (draggingLine === "top") {
         const newTopY = clampTopY(mouseY, trimTopY, bottomY);
         onClipRegionChange(newTopY, bottomY);
+        coordValue = newTopY;
       } else if (draggingLine === "bottom") {
         const newBottomY = clampBottomY(mouseY, topY, trimBottomY);
         onClipRegionChange(topY, newBottomY);
+        coordValue = newBottomY;
       } else if (draggingLine === "trimBottom") {
         const newTrimBottomY = clampTrimBottomY(mouseY, bottomY, imageHeight);
         onTrimRegionChange(trimTopY, newTrimBottomY);
+        coordValue = newTrimBottomY;
       } else if (draggingLine === "fillRightX") {
         const newFillRightX = clampFillRightX(mouseX, imageWidth);
         onFillRightXChange(newFillRightX);
+        coordValue = newFillRightX;
+      }
+
+      // 拡大鏡の描画と位置更新
+      const magnifierCanvas = magnifierCanvasRef.current;
+      const coordLabel = coordLabelRef.current;
+      if (magnifierCanvas && canvas) {
+        drawMagnifier(magnifierCanvas, canvas, mouseX, mouseY, imageWidth, imageHeight);
+        if (coordLabel) {
+          updateMagnifierPosition(
+            magnifierCanvas, coordLabel,
+            mouseX, mouseY, imageWidth, imageHeight,
+            draggingLine, coordValue
+          );
+        }
       }
     });
   };
@@ -331,16 +453,48 @@ const ImageCanvas: React.FC<IImageCanvasProps> = ({
   // 【レンダリング】: Canvas要素を描画 🔵
   // 【属性設定】: width/height はCanvas描画座標の基準として imageWidth/imageHeight を設定
   return (
-    <canvas
-      ref={canvasRef}
-      id="image-canvas"
-      width={imageWidth}
-      height={imageHeight}
-      onMouseDown={handleMouseDown}
-      onMouseMove={handleMouseMove}
-      onMouseUp={handleMouseUp}
-      onMouseLeave={handleMouseUp}
-    />
+    <div style={{ position: "relative", display: "inline-block" }}>
+      <canvas
+        ref={canvasRef}
+        id="image-canvas"
+        width={imageWidth}
+        height={imageHeight}
+        onMouseDown={handleMouseDown}
+        onMouseMove={handleMouseMove}
+        onMouseUp={handleMouseUp}
+        onMouseLeave={handleMouseUp}
+      />
+      {isDragging && (
+        <>
+          <canvas
+            ref={magnifierCanvasRef}
+            width={MAGNIFIER_SIZE}
+            height={MAGNIFIER_SIZE}
+            style={{
+              position: "absolute",
+              pointerEvents: "none",
+              borderRadius: "50%",
+              border: "2px solid rgba(255,255,255,0.6)",
+              boxShadow: "0 2px 8px rgba(0,0,0,0.4)",
+            }}
+          />
+          <div
+            ref={coordLabelRef}
+            style={{
+              position: "absolute",
+              pointerEvents: "none",
+              color: "#fff",
+              fontSize: "11px",
+              fontFamily: "Consolas, monospace",
+              background: "rgba(0,0,0,0.6)",
+              padding: "2px 6px",
+              borderRadius: "3px",
+              whiteSpace: "nowrap",
+            }}
+          />
+        </>
+      )}
+    </div>
   );
 };
 
