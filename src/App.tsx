@@ -373,33 +373,43 @@ function App() {
    * 【パフォーマンス】: useCallback で state の必要な部分のみ依存（imagePath, clipTopY, clipBottomY）
    * 🔵 信頼性レベル: 要件定義書4.2・note.md「Tauri IPC 連携パターン」より
    */
+  /**
+   * 【共通ヘルパー】: IPC clip_and_save 呼び出しを共通化
+   * handleSaveImage / handleSaveAsImage の両方から利用
+   */
+  const executeSave = useCallback(async (destPath: string) => {
+    await invoke("clip_and_save", {
+      srcPath: state.imagePath,
+      topY: Math.round(state.clipTopY),
+      bottomY: Math.round(state.clipBottomY),
+      trimTopY: Math.round(state.trimTopY),
+      trimBottomY: Math.round(state.trimBottomY),
+      fillRightX: Math.round(state.fillRightX),
+      destPath,
+    });
+  }, [state.imagePath, state.clipTopY, state.clipBottomY, state.trimTopY, state.trimBottomY, state.fillRightX]);
+
   const handleSaveImage = useCallback(async () => {
-    // 【前提条件チェック】: 画像が読み込まれていない場合は何もしない（防御的実装）
-    // 🔵 Toolbar の isImageLoaded 制御でも防いでいるが二重チェックで安全性を確保
     if (!state.imagePath) return;
 
-    // 【SAVE_START】: ボタンを無効化して保存中状態に遷移
     dispatch({ type: "SAVE_START" });
 
     try {
-      // 【保存先決定】: config.saveMode に応じて保存フローを分岐
       const fileName = state.imagePath.split(/[/\\]/).pop() ?? "clipped.png";
 
       let destPath: string | null;
 
       if (config.saveMode === "overwrite") {
-        // 【overwrite モード】: 確認ダイアログで承認後、元パスに直接上書き保存
         const confirmed = await confirm(
           `${fileName} を上書き保存します。よろしいですか？`,
           { title: "上書き保存の確認", kind: "warning" }
         );
         if (!confirmed) {
-          dispatch({ type: "SAVE_SUCCESS" }); // saving → ready に戻す
+          dispatch({ type: "SAVE_SUCCESS" });
           return;
         }
         destPath = state.imagePath;
       } else {
-        // 【clipped モード】: ダイアログ表示、{元名}_clipped.{元拡張子} をデフォルトパスに
         const dotIdx = fileName.lastIndexOf(".");
         const defaultPath = dotIdx > 0
           ? `${fileName.slice(0, dotIdx)}_clipped${fileName.slice(dotIdx)}`
@@ -410,38 +420,51 @@ function App() {
           filters: SAVE_DIALOG_FILTERS,
         });
 
-        // 【キャンセル処理】: ダイアログでキャンセルされた場合は 'ready' 状態に戻す
         if (!destPath) {
-          dispatch({ type: "SAVE_SUCCESS" }); // 【状態復元】: saving → ready に戻す
+          dispatch({ type: "SAVE_SUCCESS" });
           return;
         }
       }
 
-      // 【IPC呼び出し】: Rust側にクリップ・保存を依頼
-      // 🔵 note.md「IPC連携パターン」・要件定義書2.4「clip_and_save コマンド」より
-      // 🔵 TC-003対応: Rust側IPCコマンドはsnake_case引数（src_path, top_y, bottom_y, dest_path）を期待
-      await invoke("clip_and_save", {
-        srcPath: state.imagePath,
-        topY: Math.round(state.clipTopY),
-        bottomY: Math.round(state.clipBottomY),
-        trimTopY: Math.round(state.trimTopY),
-        trimBottomY: Math.round(state.trimBottomY),
-        fillRightX: Math.round(state.fillRightX),
-        destPath: destPath,
-      });
-
-      // 【SAVE_SUCCESS】: 保存完了で 'ready' 状態に遷移
+      await executeSave(destPath);
       dispatch({ type: "SAVE_SUCCESS" });
     } catch (error) {
-      // 【SAVE_ERROR処理】: IPC呼び出し失敗時にエラーメッセージを設定して 'error' 状態に遷移
-      // 【エラーメッセージ整形】: formatErrorMessage ヘルパーでプレフィックス付きメッセージを生成
-      // 🔵 TC-009仕様: "クリップ・保存エラー: 保存先に書き込み権限がありません" 形式を期待
       dispatch({
         type: "SAVE_ERROR",
         payload: formatErrorMessage(error, "クリップ・保存エラー: "),
       });
     }
-  }, [state.imagePath, state.clipTopY, state.clipBottomY, state.trimTopY, state.trimBottomY, state.fillRightX]); // 【依存配列】: IPC 呼び出しで使用する state フィールドのみ依存
+  }, [state.imagePath, executeSave]);
+
+  /**
+   * 【機能概要】: 「別名で保存」ボタンのクリックハンドラ
+   * 【設計方針】: 常にsaveダイアログを表示し、元画像のフルパスをデフォルトに設定
+   */
+  const handleSaveAsImage = useCallback(async () => {
+    if (!state.imagePath) return;
+
+    dispatch({ type: "SAVE_START" });
+
+    try {
+      const destPath = await save({
+        defaultPath: state.imagePath,
+        filters: SAVE_DIALOG_FILTERS,
+      });
+
+      if (!destPath) {
+        dispatch({ type: "SAVE_SUCCESS" });
+        return;
+      }
+
+      await executeSave(destPath);
+      dispatch({ type: "SAVE_SUCCESS" });
+    } catch (error) {
+      dispatch({
+        type: "SAVE_ERROR",
+        payload: formatErrorMessage(error, "クリップ・保存エラー: "),
+      });
+    }
+  }, [state.imagePath, executeSave]);
 
   /**
    * 【機能概要】: ImageCanvas のドラッグ操作で変更されたクリップ範囲を受け取るコールバック
@@ -515,6 +538,7 @@ function App() {
         isImageLoaded={isImageLoaded}
         onLoadImage={handleLoadImage}
         onSaveImage={handleSaveImage}
+        onSaveAsImage={handleSaveAsImage}
       />
 
       {/* 【エラー表示】: エラー状態の場合にエラーバーを表示 */}

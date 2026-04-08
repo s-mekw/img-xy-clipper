@@ -50,6 +50,7 @@ describe("Toolbar", () => {
         isImageLoaded={false}
         onLoadImage={vi.fn()}
         onSaveImage={vi.fn()}
+        onSaveAsImage={vi.fn()}
       />
     );
 
@@ -79,6 +80,7 @@ describe("Toolbar", () => {
         isImageLoaded={true}
         onLoadImage={vi.fn()}
         onSaveImage={vi.fn()}
+        onSaveAsImage={vi.fn()}
       />
     );
 
@@ -110,6 +112,7 @@ describe("Toolbar", () => {
         isImageLoaded={false}
         onLoadImage={mockOnLoadImage}
         onSaveImage={vi.fn()}
+        onSaveAsImage={vi.fn()}
       />
     );
 
@@ -143,6 +146,7 @@ describe("Toolbar", () => {
         isImageLoaded={true}
         onLoadImage={vi.fn()}
         onSaveImage={mockOnSaveImage}
+        onSaveAsImage={vi.fn()}
       />
     );
 
@@ -174,6 +178,7 @@ describe("Toolbar", () => {
         isImageLoaded={false}
         onLoadImage={vi.fn()}
         onSaveImage={vi.fn()}
+        onSaveAsImage={vi.fn()}
       />
     );
 
@@ -203,6 +208,7 @@ describe("Toolbar", () => {
         isImageLoaded={false}
         onLoadImage={vi.fn()}
         onSaveImage={vi.fn()}
+        onSaveAsImage={vi.fn()}
       />
     );
 
@@ -232,6 +238,7 @@ describe("Toolbar", () => {
         isImageLoaded={true}
         onLoadImage={vi.fn()}
         onSaveImage={vi.fn()}
+        onSaveAsImage={vi.fn()}
       />
     );
 
@@ -265,6 +272,7 @@ describe("Toolbar", () => {
         isImageLoaded={false}
         onLoadImage={mockOnLoadImage}
         onSaveImage={vi.fn()}
+        onSaveAsImage={vi.fn()}
       />
     );
 
@@ -299,6 +307,7 @@ describe("Toolbar", () => {
         isImageLoaded={false}
         onLoadImage={vi.fn()}
         onSaveImage={mockOnSaveImage}
+        onSaveAsImage={vi.fn()}
       />
     );
 
@@ -331,6 +340,7 @@ describe("Toolbar", () => {
         isImageLoaded={true}
         onLoadImage={vi.fn()}
         onSaveImage={vi.fn()}
+        onSaveAsImage={vi.fn()}
       />
     );
 

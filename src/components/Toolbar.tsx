@@ -26,6 +26,8 @@ interface IToolbarProps {
   onLoadImage: () => void;
   /** 【prop】: 「保存」ボタンクリック時のコールバック */
   onSaveImage: () => void;
+  /** 【prop】: 「別名で保存」ボタンクリック時のコールバック */
+  onSaveAsImage: () => void;
 }
 
 // ============================================================
@@ -54,6 +56,7 @@ export const Toolbar: React.FC<IToolbarProps> = ({
   isImageLoaded,
   onLoadImage,
   onSaveImage,
+  onSaveAsImage,
 }) => {
   return (
     <div className="toolbar">
@@ -76,6 +79,14 @@ export const Toolbar: React.FC<IToolbarProps> = ({
       >
         {/* 【ボタンテキスト】: TC-017対応: 保存中は「保存中...」、通常は「保存」 */}
         {isSaving ? "保存中..." : "保存"}
+      </button>
+
+      {/* 【別名で保存ボタン】: 常にダイアログを表示して任意の名前・場所に保存 */}
+      <button
+        onClick={onSaveAsImage}
+        disabled={!isImageLoaded || isSaving || isLoading}
+      >
+        {isSaving ? "保存中..." : "別名で保存"}
       </button>
     </div>
   );
