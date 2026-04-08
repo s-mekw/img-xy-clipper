@@ -37,6 +37,9 @@ export interface AppState {
   trimTopY: number; // 【フィールド】: トリム上端のY座標（これより上を切り取る）
   trimBottomY: number; // 【フィールド】: トリム下端のY座標（これより下を切り取る）
 
+  // 【塗りつぶし範囲】: fillRightX より右側を #fffdea で塗りつぶす
+  fillRightX: number; // 【フィールド】: 塗りつぶし開始X座標（これより右を塗りつぶす）
+
   // 【UI状態】: ステータスとエラー情報
   status: "idle" | "loading" | "ready" | "dragging" | "saving" | "error"; // 【フィールド】: アプリの現在の状態
   errorMessage: string | null; // 【フィールド】: エラーメッセージ（エラー状態時のみ設定）
@@ -64,6 +67,7 @@ export type AppAction =
   | { type: "SAVE_ERROR"; payload: string } // 【アクション】: 保存エラー（status → 'error'、errorMessage設定）
   | { type: "UPDATE_CLIP_REGION"; payload: { topY: number; bottomY: number } } // 【アクション】: クリップ範囲更新（clipTopY/clipBottomY更新）
   | { type: "UPDATE_TRIM_REGION"; payload: { trimTopY: number; trimBottomY: number } } // 【アクション】: トリム範囲更新
+  | { type: "UPDATE_FILL_RIGHT_X"; payload: { fillRightX: number } } // 【アクション】: 塗りつぶしX座標更新
   | { type: "START_DRAGGING" } // 【アクション】: ドラッグ開始（status → 'dragging'）
   | { type: "END_DRAGGING" } // 【アクション】: ドラッグ終了（status → 'ready'）
   | { type: "RESET_ERROR" }; // 【アクション】: エラーリセット（errorMessage → null）
@@ -90,6 +94,7 @@ export const initialState: AppState = {
   clipBottomY: 0, // 【初期値】: クリップ下端Y=0（画像未読込時は0）
   trimTopY: 0, // 【初期値】: トリム上端Y=0（トリムなし）
   trimBottomY: 0, // 【初期値】: トリム下端Y=0（画像未読込時は0）
+  fillRightX: 0, // 【初期値】: 塗りつぶしX=0（画像未読込時は0、読込後はimageWidthに設定）
 
   // 【UI状態の初期値】: アプリ起動直後
   status: "idle", // 【初期値】: idle（待機状態）
@@ -133,6 +138,7 @@ export function appReducer(state: AppState, action: AppAction): AppState {
         clipBottomY: Math.round(action.payload.imageHeight * 0.75), // 【初期化】: クリップ下端を画像高さの75%に設定
         trimTopY: 0, // 【初期化】: トリム上端を0に設定（トリムなし）
         trimBottomY: action.payload.imageHeight, // 【初期化】: トリム下端を画像高さに設定（トリムなし）
+        fillRightX: action.payload.imageWidth, // 【初期化】: 塗りつぶしXを画像幅に設定（塗りつぶしなし）
         errorMessage: null, // 【エラーリセット】: 前回のエラーメッセージをクリア
       };
 
@@ -179,6 +185,13 @@ export function appReducer(state: AppState, action: AppAction): AppState {
         ...state,
         trimTopY: action.payload.trimTopY,
         trimBottomY: action.payload.trimBottomY,
+      };
+
+    // 【UPDATE_FILL_RIGHT_X処理】: 塗りつぶしX座標更新 → fillRightX のみ更新
+    case "UPDATE_FILL_RIGHT_X":
+      return {
+        ...state,
+        fillRightX: action.payload.fillRightX,
       };
 
     // 【START_DRAGGING処理】: ドラッグ開始 → status を 'dragging' に遷移
@@ -413,6 +426,7 @@ function App() {
         bottomY: Math.round(state.clipBottomY),
         trimTopY: Math.round(state.trimTopY),
         trimBottomY: Math.round(state.trimBottomY),
+        fillRightX: Math.round(state.fillRightX),
         destPath: destPath,
       });
 
@@ -427,7 +441,7 @@ function App() {
         payload: formatErrorMessage(error, "クリップ・保存エラー: "),
       });
     }
-  }, [state.imagePath, state.clipTopY, state.clipBottomY, state.trimTopY, state.trimBottomY]); // 【依存配列】: IPC 呼び出しで使用する state フィールドのみ依存
+  }, [state.imagePath, state.clipTopY, state.clipBottomY, state.trimTopY, state.trimBottomY, state.fillRightX]); // 【依存配列】: IPC 呼び出しで使用する state フィールドのみ依存
 
   /**
    * 【機能概要】: ImageCanvas のドラッグ操作で変更されたクリップ範囲を受け取るコールバック
@@ -454,6 +468,13 @@ function App() {
     },
     []
   );
+
+  const handleFillRightXChange = useCallback((fillRightX: number) => {
+    dispatch({
+      type: "UPDATE_FILL_RIGHT_X",
+      payload: { fillRightX },
+    });
+  }, []);
 
   /**
    * 【機能概要】: エラーバーの「閉じる」ボタンクリックハンドラ
@@ -520,8 +541,10 @@ function App() {
           bottomY={state.clipBottomY}
           trimTopY={state.trimTopY}
           trimBottomY={state.trimBottomY}
+          fillRightX={state.fillRightX}
           onClipRegionChange={handleClipRegionChange}
           onTrimRegionChange={handleTrimRegionChange}
+          onFillRightXChange={handleFillRightXChange}
         />
 
         {/* 【PreviewPanel配置】: 選択範囲のリアルタイム拡大プレビュー */}
@@ -533,6 +556,7 @@ function App() {
           bottomY={state.clipBottomY}
           trimTopY={state.trimTopY}
           trimBottomY={state.trimBottomY}
+          fillRightX={state.fillRightX}
         />
       </div>
     </main>

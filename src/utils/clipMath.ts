@@ -61,3 +61,11 @@ export function clampTrimTopY(y: number, clipTopY: number): number {
 export function clampTrimBottomY(y: number, clipBottomY: number, imageHeight: number): number {
   return clamp(y, clipBottomY, imageHeight);
 }
+
+/**
+ * 【ヘルパー関数】: fillRightX ドラッグ時のX座標クランプ
+ * 【制約】: 0 <= fillRightX <= imageWidth
+ */
+export function clampFillRightX(x: number, imageWidth: number): number {
+  return clamp(x, 0, imageWidth);
+}

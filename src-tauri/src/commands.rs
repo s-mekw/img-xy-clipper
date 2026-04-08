@@ -23,7 +23,8 @@ pub fn clip_and_save(
     bottom_y: u32,
     trim_top_y: u32,
     trim_bottom_y: u32,
+    fill_right_x: u32,
     dest_path: String,
 ) -> Result<(), String> {
-    image_processor::clip_and_save(&src_path, top_y, bottom_y, trim_top_y, trim_bottom_y, &dest_path)
+    image_processor::clip_and_save(&src_path, top_y, bottom_y, trim_top_y, trim_bottom_y, fill_right_x, &dest_path)
 }

@@ -50,6 +50,8 @@ describe("ImageCanvas", () => {
       trimBottomY: 0,
       onClipRegionChange: vi.fn(),
       onTrimRegionChange: vi.fn(),
+      fillRightX: 200,
+      onFillRightXChange: vi.fn(),
     };
 
     // 【実際の処理実行】: 画像なし状態でコンポーネントをレンダリング
@@ -82,6 +84,8 @@ describe("ImageCanvas", () => {
       trimBottomY: 300,
       onClipRegionChange: vi.fn(),
       onTrimRegionChange: vi.fn(),
+      fillRightX: 200,
+      onFillRightXChange: vi.fn(),
     };
 
     // 【実際の処理実行】: 画像データありでコンポーネントをレンダリング
@@ -118,6 +122,8 @@ describe("ImageCanvas", () => {
       trimBottomY: 300,
       onClipRegionChange: mockOnClipRegionChange,
       onTrimRegionChange: vi.fn(),
+      fillRightX: 200,
+      onFillRightXChange: vi.fn(),
     };
 
     // 【実際の処理実行】: コンポーネントをレンダリングしてマウスイベントを発火
@@ -165,6 +171,8 @@ describe("ImageCanvas", () => {
       trimBottomY: 300,
       onClipRegionChange: mockOnClipRegionChange,
       onTrimRegionChange: vi.fn(),
+      fillRightX: 200,
+      onFillRightXChange: vi.fn(),
     };
 
     const { container } = render(<ImageCanvas {...props} />);
@@ -206,6 +214,8 @@ describe("ImageCanvas", () => {
       trimBottomY: 300,
       onClipRegionChange: mockOnClipRegionChange,
       onTrimRegionChange: mockOnTrimRegionChange,
+      fillRightX: 200,
+      onFillRightXChange: vi.fn(),
     };
 
     const { container } = render(<ImageCanvas {...props} />);

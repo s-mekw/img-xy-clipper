@@ -19,4 +19,4 @@ export interface ClipRegion {
  * 【用途】: useClipRegion フック・ImageCanvas コンポーネントで共有
  * 🔵
  */
-export type DraggingLine = "top" | "bottom" | "trimTop" | "trimBottom" | null;
+export type DraggingLine = "top" | "bottom" | "trimTop" | "trimBottom" | "fillRightX" | null;

@@ -4,7 +4,7 @@
 
 import React, { useRef, useEffect, useState } from "react";
 import type { DraggingLine } from "../types/clip";
-import { clampTopY, clampBottomY, clampTrimTopY, clampTrimBottomY } from "../utils/clipMath";
+import { clampTopY, clampBottomY, clampTrimTopY, clampTrimBottomY, clampFillRightX } from "../utils/clipMath";
 
 // 【インターフェース定義】: ImageCanvasコンポーネントのPropsを定義 🔵
 interface IImageCanvasProps {
@@ -15,8 +15,10 @@ interface IImageCanvasProps {
   bottomY: number;
   trimTopY: number;
   trimBottomY: number;
+  fillRightX: number;
   onClipRegionChange: (topY: number, bottomY: number) => void;
   onTrimRegionChange: (trimTopY: number, trimBottomY: number) => void;
+  onFillRightXChange: (fillRightX: number) => void;
 }
 
 // 【定数定義】: 水平線のドラッグ可能範囲（線の上下 ±DRAG_THRESHOLD px 以内） 🔵
@@ -30,6 +32,9 @@ const OVERLAY_COLOR = "rgba(0,0,0,0.5)";
 // 【定数定義】: 水平線の色・太さ設定 🔵
 const LINE_COLOR = "#FF0000";
 const LINE_WIDTH = 2;
+
+const FILL_COLOR = "#fffdea";
+const VERTICAL_LINE_COLOR = "#0000FF";
 
 // ------------------------------------------------------------
 // Canvas描画ヘルパー関数（onloadコールバックの分割）
@@ -103,6 +108,36 @@ function drawAllLines(
   }
 }
 
+/**
+ * 【ヘルパー関数】: fillRightX より右側を #fffdea で不透明塗りつぶし
+ */
+function drawFillOverlay(
+  ctx: CanvasRenderingContext2D,
+  fillRightX: number,
+  imageWidth: number,
+  imageHeight: number
+): void {
+  if (fillRightX >= imageWidth) return;
+  ctx.fillStyle = FILL_COLOR;
+  ctx.fillRect(fillRightX, 0, imageWidth - fillRightX, imageHeight);
+}
+
+/**
+ * 【ヘルパー関数】: fillRightX 位置に青色の垂直線を描画する
+ */
+function drawVerticalLine(
+  ctx: CanvasRenderingContext2D,
+  fillRightX: number,
+  imageHeight: number
+): void {
+  ctx.strokeStyle = VERTICAL_LINE_COLOR;
+  ctx.lineWidth = LINE_WIDTH;
+  ctx.beginPath();
+  ctx.moveTo(fillRightX, 0);
+  ctx.lineTo(fillRightX, imageHeight);
+  ctx.stroke();
+}
+
 // ------------------------------------------------------------
 // ImageCanvas コンポーネント
 // ------------------------------------------------------------
@@ -129,8 +164,10 @@ const ImageCanvas: React.FC<IImageCanvasProps> = ({
   bottomY,
   trimTopY,
   trimBottomY,
+  fillRightX,
   onClipRegionChange,
   onTrimRegionChange,
+  onFillRightXChange,
 }) => {
   // 【Ref定義】: Canvas要素への参照（Canvas API操作のために使用） 🔵
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -168,11 +205,13 @@ const ImageCanvas: React.FC<IImageCanvasProps> = ({
     const image = new Image();
     image.onload = () => {
       drawBackgroundImage(ctx, image);
+      drawFillOverlay(ctx, fillRightX, imageWidth, imageHeight);
       drawOverlay(ctx, imageWidth, imageHeight, trimTopY, topY, bottomY, trimBottomY);
       drawAllLines(ctx, imageWidth, trimTopY, topY, bottomY, trimBottomY);
+      drawVerticalLine(ctx, fillRightX, imageHeight);
     };
     image.src = imageData;
-  }, [imageData, imageWidth, imageHeight, topY, bottomY, trimTopY, trimBottomY]);
+  }, [imageData, imageWidth, imageHeight, topY, bottomY, trimTopY, trimBottomY, fillRightX]);
 
   // ------------------------------------------------------------
   // マウスイベントハンドラ
@@ -208,6 +247,14 @@ const ImageCanvas: React.FC<IImageCanvasProps> = ({
         return;
       }
     }
+
+    // 垂直線（fillRightX）のヒットテスト
+    const mouseX = e.clientX - rect.left;
+    if (Math.abs(mouseX - fillRightX) <= DRAG_THRESHOLD) {
+      setDraggingLine("fillRightX");
+      setIsDragging(true);
+      return;
+    }
   };
 
   /**
@@ -229,9 +276,10 @@ const ImageCanvas: React.FC<IImageCanvasProps> = ({
     const canvas = canvasRef.current;
     if (!canvas) return;
 
-    // 【Canvas座標変換】: クライアント座標をCanvas上のY座標に変換 🔵
+    // 【Canvas座標変換】: クライアント座標をCanvas上の座標に変換 🔵
     const rect = canvas.getBoundingClientRect();
     const mouseY = e.clientY - rect.top;
+    const mouseX = e.clientX - rect.left;
 
     // 【rAF重複防止】: 前のフレームが未実行の場合はキャンセルして最新の座標のみを処理 🔵
     // 【理由】: mousemoveは60fps以上の頻度で発火するため、rAFで描画フレームに同期させる
@@ -254,6 +302,9 @@ const ImageCanvas: React.FC<IImageCanvasProps> = ({
       } else if (draggingLine === "trimBottom") {
         const newTrimBottomY = clampTrimBottomY(mouseY, bottomY, imageHeight);
         onTrimRegionChange(trimTopY, newTrimBottomY);
+      } else if (draggingLine === "fillRightX") {
+        const newFillRightX = clampFillRightX(mouseX, imageWidth);
+        onFillRightXChange(newFillRightX);
       }
     });
   };

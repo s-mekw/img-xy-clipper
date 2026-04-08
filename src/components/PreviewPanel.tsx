@@ -19,6 +19,7 @@ interface IPreviewPanelProps {
   bottomY: number;
   trimTopY: number;
   trimBottomY: number;
+  fillRightX: number;
 }
 
 // （PREVIEW_WIDTH は廃止: Canvas幅は imageWidth をそのまま使用する）
@@ -39,6 +40,7 @@ const PreviewPanel: React.FC<IPreviewPanelProps> = ({
   bottomY,
   trimTopY,
   trimBottomY,
+  fillRightX,
 }) => {
   // 【Ref定義1】: Canvas要素への参照（Canvas API操作のために使用） 🔵
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -112,6 +114,12 @@ const PreviewPanel: React.FC<IPreviewPanelProps> = ({
           0, topCanvasH, canvas.width, bottomCanvasH,
         );
       }
+
+      // 【塗りつぶし描画】: fillRightX より右側を #fffdea で塗りつぶし
+      if (fillRightX < imageWidth) {
+        ctx.fillStyle = "#fffdea";
+        ctx.fillRect(fillRightX, 0, canvas.width - fillRightX, canvas.height);
+      }
     };
 
     // 【Imageキャッシュヒット判定】: 同じ imageData が既にキャッシュ済みかを確認 🔵
@@ -151,7 +159,7 @@ const PreviewPanel: React.FC<IPreviewPanelProps> = ({
       //           Canvas への drawImage 呼び出しを防ぐ
       img.onload = null;
     };
-  }, [imageData, imageWidth, imageHeight, topY, bottomY, trimTopY, trimBottomY]); // 【依存配列】: 変更時に再描画（TC-004, TC-005, TC-007対応） 🔵
+  }, [imageData, imageWidth, imageHeight, topY, bottomY, trimTopY, trimBottomY, fillRightX]); // 【依存配列】: 変更時に再描画 🔵
 
   // 【レンダリング】: Canvas要素を描画 🔵
   // 【属性設定】:

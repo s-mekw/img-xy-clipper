@@ -136,6 +136,7 @@ pub fn clip_and_save(
     bottom_y: u32,
     trim_top_y: u32,
     trim_bottom_y: u32,
+    fill_right_x: u32,
     dest_path: &str,
 ) -> Result<(), String> {
     // 【座標バリデーション】: trim_top_y <= top_y <= bottom_y <= trim_bottom_y
@@ -184,6 +185,12 @@ pub fn clip_and_save(
             trim_bottom_y, height
         ));
     }
+    if fill_right_x > width {
+        return Err(format!(
+            "塗りつぶしX座標 {} が画像の幅 {} を超えています",
+            fill_right_x, width
+        ));
+    }
 
     // 【トリム+クリップ処理】: 残る部分 = [trim_top_y..top_y] + [bottom_y..trim_bottom_y]
     let top_height = top_y - trim_top_y;
@@ -194,7 +201,7 @@ pub fn clip_and_save(
         return Err("除去範囲が画像全体のため出力画像がありません".to_string());
     }
 
-    let output = if top_y == bottom_y && trim_top_y == 0 && trim_bottom_y == height {
+    let mut output = if top_y == bottom_y && trim_top_y == 0 && trim_bottom_y == height {
         // 【変更なし】: クリップもトリムもない場合は元画像をそのまま使用
         img
     } else {
@@ -214,6 +221,18 @@ pub fn clip_and_save(
         }
         output
     };
+
+    // 【塗りつぶし処理】: fillRightX より右側を #fffdea で塗りつぶし
+    if fill_right_x < output.width() {
+        let mut rgba = output.to_rgba8();
+        let fill = image::Rgba([0xff, 0xfd, 0xea, 0xff]);
+        for y in 0..rgba.height() {
+            for x in fill_right_x..rgba.width() {
+                rgba.put_pixel(x, y, fill);
+            }
+        }
+        output = image::DynamicImage::ImageRgba8(rgba);
+    }
 
     // 【保存形式の判定】: 保存先パスの拡張子からユーザー意図の形式を判定する。 🔵
     // バイトシグネチャではなく拡張子ベースで判定するのは、ユーザーが指定した
