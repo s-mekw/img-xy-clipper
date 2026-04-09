@@ -4,8 +4,9 @@
  * 【テスト対応】: TC-001〜TC-018（App統合テスト）・TC-021〜TC-026（appReducer単体テスト）
  * 🔵 信頼性レベル: note.md・要件定義書2.2/2.3・dataflow.md のReducerパターンより
  */
-import { useReducer, useCallback } from "react";
+import { useReducer, useCallback, useEffect, useRef } from "react";
 import { invoke } from "@tauri-apps/api/core";
+import { getCurrentWebview } from "@tauri-apps/api/webview";
 import { open, save, confirm } from "@tauri-apps/plugin-dialog";
 import Toolbar from "./components/Toolbar";
 import ImageCanvas from "./components/ImageCanvas";
@@ -43,6 +44,9 @@ export interface AppState {
   // 【UI状態】: ステータスとエラー情報
   status: "idle" | "loading" | "ready" | "dragging" | "saving" | "error"; // 【フィールド】: アプリの現在の状態
   errorMessage: string | null; // 【フィールド】: エラーメッセージ（エラー状態時のみ設定）
+
+  // 【D&D状態】: ファイルがウィンドウ上にドラッグされているか
+  isDragOver: boolean; // 【フィールド】: ファイルドラッグ中はtrue（キャンバス操作のdraggingとは別管理）
 }
 
 /**
@@ -70,7 +74,9 @@ export type AppAction =
   | { type: "UPDATE_FILL_RIGHT_X"; payload: { fillRightX: number } } // 【アクション】: 塗りつぶしX座標更新
   | { type: "START_DRAGGING" } // 【アクション】: ドラッグ開始（status → 'dragging'）
   | { type: "END_DRAGGING" } // 【アクション】: ドラッグ終了（status → 'ready'）
-  | { type: "RESET_ERROR" }; // 【アクション】: エラーリセット（errorMessage → null）
+  | { type: "RESET_ERROR" } // 【アクション】: エラーリセット（errorMessage → null）
+  | { type: "DRAG_OVER_FILE" } // 【アクション】: ファイルがウィンドウ上にドラッグされた（isDragOver → true）
+  | { type: "DRAG_LEAVE_FILE" }; // 【アクション】: ファイルがウィンドウから離れた（isDragOver → false）
 
 // ============================================================
 // 初期状態（named export）
@@ -99,6 +105,9 @@ export const initialState: AppState = {
   // 【UI状態の初期値】: アプリ起動直後
   status: "idle", // 【初期値】: idle（待機状態）
   errorMessage: null, // 【初期値】: エラーなし
+
+  // 【D&D状態の初期値】
+  isDragOver: false, // 【初期値】: ファイルドラッグなし
 };
 
 // ============================================================
@@ -119,7 +128,7 @@ export function appReducer(state: AppState, action: AppAction): AppState {
     // 【LOAD_START処理】: ファイル読み込み開始 → status を 'loading' に遷移
     // 🔵 TC-001, TC-026対応: idle/loading → LOAD_START → loading
     case "LOAD_START":
-      return { ...state, status: "loading" };
+      return { ...state, status: "loading", isDragOver: false };
 
     // 【LOAD_SUCCESS処理】: ファイル読み込み成功 → 画像情報を設定し status を 'ready' に遷移
     // 🔵 TC-002, TC-015, TC-023, TC-025対応: loading → LOAD_SUCCESS → ready
@@ -209,6 +218,14 @@ export function appReducer(state: AppState, action: AppAction): AppState {
     case "RESET_ERROR":
       return { ...state, errorMessage: null };
 
+    // 【DRAG_OVER_FILE処理】: ファイルがウィンドウ上にドラッグされた → isDragOver を true に設定
+    case "DRAG_OVER_FILE":
+      return { ...state, isDragOver: true };
+
+    // 【DRAG_LEAVE_FILE処理】: ファイルがウィンドウから離れた → isDragOver を false に設定
+    case "DRAG_LEAVE_FILE":
+      return { ...state, isDragOver: false };
+
     // 【デフォルト処理】: 未定義のアクションタイプ → 現在の状態をそのまま返す
     // 🔵 TC-021対応: 防御的プログラミング（未知のアクションで状態を破壊しない）
     default:
@@ -242,12 +259,28 @@ interface ImageMetadata {
  * 【設計方針】: 対応画像形式（PNG/JPG/JPEG）をまとめて管理。将来の形式追加も1箇所の変更で済む
  * 🔵 信頼性レベル: テストケース定義書TC-005仕様・要件定義書REQ-001（PNG/JPEG対応）より
  */
+/**
+ * 【設定定数】: 対応画像ファイルの拡張子リスト
+ * 【設計方針】: ダイアログフィルタとD&Dバリデーションの両方で再利用（DRY原則）
+ */
+const ALLOWED_IMAGE_EXTENSIONS = ["png", "jpg", "jpeg"];
+
 const OPEN_DIALOG_FILTERS = [
   {
     name: "Images", // 【フィルタ名】: TC-005仕様: "Images"（複数形）
-    extensions: ["png", "jpg", "jpeg"], // 【対応拡張子】: PNG・JPEG の全パターンを網羅
+    extensions: ALLOWED_IMAGE_EXTENSIONS, // 【対応拡張子】: PNG・JPEG の全パターンを網羅
   },
 ];
+
+/**
+ * 【ヘルパー関数】: ファイルパスの拡張子が対応画像形式かどうかを判定する
+ * @param filePath - 判定対象のファイルパス
+ * @returns 対応画像形式の場合 true
+ */
+function isAllowedImageFile(filePath: string): boolean {
+  const ext = filePath.split(".").pop()?.toLowerCase() ?? "";
+  return ALLOWED_IMAGE_EXTENSIONS.includes(ext);
+}
 
 /**
  * 【設定定数】: ファイル保存ダイアログのフィルタ設定
@@ -303,6 +336,10 @@ function App() {
   // 【状態管理初期化】: useReducer で AppState を集中管理
   // 【実装理由】: 複数の状態項目（画像情報・クリップ範囲・UI状態）を一元管理するためuseReducerを採用
   const [state, dispatch] = useReducer(appReducer, initialState);
+
+  // 【D&D用status参照】: useEffect内のクロージャから最新statusを参照するためのRef
+  const statusRef = useRef(state.status);
+  statusRef.current = state.status;
 
   // ============================================================
   // イベントハンドラ（useCallback でメモ化）
@@ -508,6 +545,78 @@ function App() {
     dispatch({ type: "RESET_ERROR" });
   }, []);
 
+  /**
+   * 【機能概要】: D&Dで受け取ったファイルパスから画像を読み込むコールバック
+   * 【設計方針】: handleLoadImageのダイアログ部分を除いた、パスを直接受けてIPCを呼ぶ版
+   */
+  const handleDropFile = useCallback(async (filePath: string) => {
+    dispatch({ type: "LOAD_START" });
+    try {
+      const metadata = await invoke<ImageMetadata>("load_image", {
+        path: filePath,
+      });
+      dispatch({
+        type: "LOAD_SUCCESS",
+        payload: {
+          imagePath: filePath,
+          imageData: `data:image/${metadata.format};base64,${metadata.base64}`,
+          imageWidth: metadata.width,
+          imageHeight: metadata.height,
+          imageFormat: metadata.format,
+        },
+      });
+    } catch (error) {
+      dispatch({
+        type: "LOAD_ERROR",
+        payload: formatErrorMessage(error, "画像読み込みエラー: "),
+      });
+    }
+  }, []);
+
+  // ============================================================
+  // D&Dイベントリスナー（Tauri onDragDropEvent）
+  // ============================================================
+
+  useEffect(() => {
+    let unlisten: (() => void) | undefined;
+
+    getCurrentWebview()
+      .onDragDropEvent((event) => {
+        const currentStatus = statusRef.current;
+        // loading/saving中はD&Dを完全無視（オーバーレイも出さない）
+        if (currentStatus === "loading" || currentStatus === "saving") return;
+
+        if (event.payload.type === "over") {
+          dispatch({ type: "DRAG_OVER_FILE" });
+        } else if (event.payload.type === "drop") {
+          dispatch({ type: "DRAG_LEAVE_FILE" });
+          const paths = event.payload.paths;
+          if (!paths || paths.length === 0) return;
+          // 複数ファイル → 最初の1つだけ使用（警告なし）
+          const filePath = paths[0];
+          if (!isAllowedImageFile(filePath)) {
+            dispatch({
+              type: "LOAD_ERROR",
+              payload:
+                "非対応のファイル形式です。PNG/JPEG画像をドロップしてください。",
+            });
+            return;
+          }
+          handleDropFile(filePath);
+        } else {
+          // cancel
+          dispatch({ type: "DRAG_LEAVE_FILE" });
+        }
+      })
+      .then((fn) => {
+        unlisten = fn;
+      });
+
+    return () => {
+      unlisten?.();
+    };
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
   // ============================================================
   // 派生状態（state から計算）
   // ============================================================
@@ -553,35 +662,50 @@ function App() {
         </div>
       )}
 
-      {/* 【メインコンテンツエリア】: ImageCanvas（左）と PreviewPanel（右）を横並びに配置 */}
-      {/* 🔵 architecture.md「コンポーネント構成」より: ImageCanvas左側・PreviewPanel右側 */}
-      <div className="content-area">
-        {/* 【ImageCanvas配置】: 画像表示とドラッグ操作 */}
-        <ImageCanvas
-          imageData={state.imageData}
-          imageWidth={state.imageWidth}
-          imageHeight={state.imageHeight}
-          topY={state.clipTopY}
-          bottomY={state.clipBottomY}
-          trimTopY={state.trimTopY}
-          trimBottomY={state.trimBottomY}
-          fillRightX={state.fillRightX}
-          onClipRegionChange={handleClipRegionChange}
-          onTrimRegionChange={handleTrimRegionChange}
-          onFillRightXChange={handleFillRightXChange}
-        />
+      {/* 【D&Dオーバーレイ】: ファイルドラッグ中に画面全体に表示 */}
+      {state.isDragOver && (
+        <div className="drag-overlay">
+          <div className="drag-overlay-content">画像をドロップ</div>
+        </div>
+      )}
 
-        {/* 【PreviewPanel配置】: 選択範囲のリアルタイム拡大プレビュー */}
-        <PreviewPanel
-          imageData={state.imageData}
-          imageWidth={state.imageWidth}
-          imageHeight={state.imageHeight}
-          topY={state.clipTopY}
-          bottomY={state.clipBottomY}
-          trimTopY={state.trimTopY}
-          trimBottomY={state.trimBottomY}
-          fillRightX={state.fillRightX}
-        />
+      {/* 【メインコンテンツエリア】: 画像読込済み→ImageCanvas+PreviewPanel、未読込→プレースホルダー */}
+      <div className="content-area">
+        {state.imageData ? (
+          <>
+            {/* 【ImageCanvas配置】: 画像表示とドラッグ操作 */}
+            <ImageCanvas
+              imageData={state.imageData}
+              imageWidth={state.imageWidth}
+              imageHeight={state.imageHeight}
+              topY={state.clipTopY}
+              bottomY={state.clipBottomY}
+              trimTopY={state.trimTopY}
+              trimBottomY={state.trimBottomY}
+              fillRightX={state.fillRightX}
+              onClipRegionChange={handleClipRegionChange}
+              onTrimRegionChange={handleTrimRegionChange}
+              onFillRightXChange={handleFillRightXChange}
+            />
+
+            {/* 【PreviewPanel配置】: 選択範囲のリアルタイム拡大プレビュー */}
+            <PreviewPanel
+              imageData={state.imageData}
+              imageWidth={state.imageWidth}
+              imageHeight={state.imageHeight}
+              topY={state.clipTopY}
+              bottomY={state.clipBottomY}
+              trimTopY={state.trimTopY}
+              trimBottomY={state.trimBottomY}
+              fillRightX={state.fillRightX}
+            />
+          </>
+        ) : (
+          <div className="drop-placeholder">
+            <span>ここにファイルをドロップ</span>
+            <span>またはボタンで開く</span>
+          </div>
+        )}
       </div>
     </main>
   );
