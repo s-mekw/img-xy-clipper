@@ -6,10 +6,13 @@
 
 ## 機能一覧
 
-- **画像読み込み** — PNG / JPEG 画像をファイルダイアログから選択して読み込み
-- **Y軸ドラッグ選択** — マウスドラッグで上端・下端のY座標を指定
-- **リアルタイムプレビュー** — 選択範囲のクリップ結果をリアルタイムでプレビュー表示
-- **クリップ保存** — 選択範囲でクリップした画像をPNG / JPEGとして保存
+- **画像読み込み** — PNG / JPEG 画像をファイルダイアログまたはドラッグ＆ドロップで読み込み
+- **Y軸クリップ選択** — マウスドラッグで上端・下端のY座標を指定し、選択範囲を除去して上下を結合
+- **Y軸トリミング** — トリム線2本で画像の上下を切り取り
+- **右側塗りつぶし** — fillRightX垂直線で指定した位置より右側を塗りつぶし（#fffdea）
+- **拡大鏡（マグニファイア）** — ドラッグ操作時にピクセル単位の拡大鏡を表示
+- **リアルタイムプレビュー** — クリップ・トリミング結果をリアルタイムでプレビュー表示
+- **上書き保存 / 別名で保存** — config.jsonのsaveModeで保存フローを制御（上書き時は確認ダイアログ付き）
 
 ## 技術スタック
 
@@ -79,13 +82,16 @@ imgX-Clip/
 ├── src/                        # フロントエンド (React)
 │   ├── App.tsx                 # メインアプリコンポーネント
 │   ├── main.tsx                # エントリーポイント
+│   ├── config.json             # アプリ設定（saveMode等）
 │   ├── components/
-│   │   ├── ImageCanvas.tsx     # 画像表示・ドラッグ操作
+│   │   ├── ImageCanvas.tsx     # 画像表示・ドラッグ操作・拡大鏡
 │   │   ├── PreviewPanel.tsx    # クリップ結果プレビュー
-│   │   └── Toolbar.tsx         # ツールバー（読み込み・保存）
+│   │   └── Toolbar.tsx         # ツールバー（読み込み・保存・別名保存）
 │   ├── hooks/
 │   │   └── useClipRegion.ts    # ドラッグ状態管理フック
 │   ├── types/                  # TypeScript型定義
+│   ├── utils/
+│   │   └── clipMath.ts         # クリップ計算ユーティリティ
 │   └── styles/
 │       └── index.css
 ├── src-tauri/                  # バックエンド (Rust)
@@ -111,7 +117,7 @@ imgX-Clip/
 | コマンド | 引数 | 戻り値 | 説明 |
 |---------|------|--------|------|
 | `load_image` | `path: string` | `ImageMetadata` | 画像を読み込み、Base64エンコードとメタデータ（幅・高さ・形式）を返す |
-| `clip_and_save` | `src_path: string, top_y: number, bottom_y: number, dest_path: string` | `void` | 指定Y範囲でクリップした画像を保存先パスに書き出す |
+| `clip_and_save` | `src_path, top_y, bottom_y, trim_top_y, trim_bottom_y, fill_right_x, dest_path` | `void` | クリップ・トリミング・右側塗りつぶしを適用して保存 |
 
 ### ImageMetadata
 
