@@ -56,7 +56,14 @@
       "Bash(grep -rn \"from.*App\" /c/Users/shota/Projects/2026/imgX-Clip/src/components/__tests__/ 2>/dev/null | head -10)",
       "Bash(cd C:/Users/shota/Projects/2026/imgX-Clip && npm run tauri dev 2>&1)",
       "Bash(npx vitest:*)",
-      "Bash(git add:*)"
+      "Bash(git add:*)",
+      "Bash(git commit:*)",
+      "Skill(dig:dig)",
+      "Bash(cargo test:*)",
+      "Bash(cargo check:*)",
+      "Bash(xargs grep:*)",
+      "mcp__plugin_context7_context7__resolve-library-id",
+      "mcp__plugin_context7_context7__query-docs"
     ],
     "defaultMode": "auto"
   }
